@@ -1,0 +1,90 @@
+g3zyXEK7Se4eUedcC0eJqu3a4Jc=bash /home/dotnet/bashfile/mkdirExecuteFolder.sh manualjava112
+output:
+error:mkdir: ディレクトリ `/home/dotnet/executeFiles/manualjava112' を作成できません: ファイルが存在します
+
+exitCode:1
+コンテナ作成に失敗しましたリトライします。
+bash -c "docker stop -t 0 manualjava112 "
+manualjava112
+output:
+error:
+exitCode:0
+bash /home/dotnet/bashfile/rmExecuteFolder.sh manualjava112
+output:
+error:
+exitCode:0
+bash /home/dotnet/bashfile/mkdirExecuteFolder.sh manualjava112
+output:
+error:
+exitCode:0
+bash /home/dotnet/bashfile/cpExecuteFolder.sh java11 manualjava112
+output:
+error:
+exitCode:0
+bash /home/dotnet/bashfile/container.sh java11 manualjava112
+7feeaf81e5615363de85b7b439aa07cf0b941a12c8da6c7a8957c3f44b606df0
+output:
+error:
+exitCode:0
+bash -c "docker exec -w /opt/bin manualjava112 bash compile.sh HelloWorld"
+output:
+error:
+exitCode:0
+コンテナに接続できました。
+sjisでエンコードする場合はjavacs、UTF-8でエンコードする場合はjavacuと入力してください
+bash -c "docker exec -i -w /opt/data manualjava112 bash -c 'basename `pwd`'"
+data
+output:
+error:
+exitCode:0
+data>bash -c "docker exec -i -w /opt/data manualjava112 bash -c 'でｑ'"
+output:
+error:bash: $'\343\201\247\357\275\221': command not found
+
+exitCode:127
+bash: $'\343\201\247\357\275\221': command not found
+bash -c "docker exec -i -w /opt/data manualjava112 bash -c 'basename `pwd`'"
+data
+output:
+error:
+exitCode:0
+data>hHY10PyYs8xx8wW2D4+xEELJpP4=bash /home/dotnet/bashfile/mkdirExecuteFolder.sh manualjava111
+output:
+error:mkdir: ディレクトリ `/home/dotnet/executeFiles/manualjava111' を作成できません: ファイルが存在します
+
+exitCode:1
+コンテナ作成に失敗しましたリトライします。
+bash -c "docker stop -t 0 manualjava111 "
+manualjava111
+output:
+error:
+exitCode:0
+bash /home/dotnet/bashfile/rmExecuteFolder.sh manualjava111
+output:
+error:
+exitCode:0
+bash /home/dotnet/bashfile/mkdirExecuteFolder.sh manualjava111
+output:
+error:
+exitCode:0
+bash /home/dotnet/bashfile/cpExecuteFolder.sh java11 manualjava111
+output:
+error:
+exitCode:0
+bash /home/dotnet/bashfile/container.sh java11 manualjava111
+f99e8a54abd1039583a57a864a7587b80a9cb5c15a2c0abc31cfdbbdabdf3bfc
+output:
+error:
+exitCode:0
+bash -c "docker exec -w /opt/bin manualjava111 bash compile.sh HelloWorld"
+output:
+error:
+exitCode:0
+コンテナに接続できました。
+sjisでエンコードする場合はjavacs、UTF-8でエンコードする場合はjavacuと入力してください
+bash -c "docker exec -i -w /opt/data manualjava111 bash -c 'basename `pwd`'"
+data
+output:
+error:
+exitCode:0
+data>
