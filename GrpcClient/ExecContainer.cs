@@ -39,8 +39,6 @@ namespace GrpcClient
             }
 
             while (true) { await Task.Delay(10000); }
-
-            Console.ReadKey();
             foreach (var server in AutoExecList)
             {
                 await server.RequestStream.CompleteAsync();
@@ -66,15 +64,6 @@ namespace GrpcClient
                         await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = "not available language.", AnswerFile = "not available language.", Correction = 0 });
                         continue;
                     }
-
-                    // foreach (FileInformation fileInformation in autoContainerArguments.SubmissionFiles)
-                    // {
-                    //     if (fileInformation.FileName.Contains("zip"))
-                    //     {
-                    //         await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = "this is zip.", AnswerFile = "this is zip.", Correction = 0 });
-                    //         continue;
-                    //     }
-                    // }
                     Command autoExec = new Command(autoContainerArguments.ContainerName, autoContainerArguments.Lang, true, autoContainerArguments.InputStr);
                     StandardCmd submissionFileResult = await autoExec.AutoExecAsync(autoContainerArguments.SubmissionFiles);
                     if (autoContainerArguments.MatchType == 0)
@@ -132,7 +121,6 @@ namespace GrpcClient
                         autoContainerArguments.CorrectionBool
                             = comparison.CompareFilesMatch(autoContainerArguments.SubmissionFileResult, autoContainerArguments.AnswerFileResult);
                     }
-                    else if (autoContainerArguments.MatchType == 0) { }
                     if (autoContainerArguments.MatchType != 0)
                     {
                         if (autoContainerArguments.CorrectionBool)
@@ -148,14 +136,9 @@ namespace GrpcClient
                     executionResult.AnswerFile = autoContainerArguments.AnswerFileResult;
                     executionResult.Correction = autoContainerArguments.Correction;
 
-
-
-                    //振り分けの動作テスト用
-                    // await Task.Delay(3000);
                     await server.RequestStream.WriteAsync(executionResult);
                     Console.WriteLine("-----end-----\n");
                 }
-                Console.WriteLine("-----接続終了-----");
                 await server.RequestStream.CompleteAsync();
             }
             catch (Exception ex)
@@ -176,8 +159,6 @@ namespace GrpcClient
             }
 
             while (true) { await Task.Delay(10000); }
-
-            Console.ReadKey();
         }
         public async Task ManualExecAsync(AsyncServerStreamingCall<SubmissionInformation> server, int i)
         {
@@ -289,7 +270,6 @@ namespace GrpcClient
             {
                 Console.WriteLine(ex.ToString());
             }
-            Console.WriteLine("-----接続終了-----");
 
             return;
         }

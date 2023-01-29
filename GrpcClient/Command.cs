@@ -220,7 +220,8 @@ namespace GrpcClient
             string cp = "/home/kondo/bashfile/cpExecuteFolder.sh " + lang + " " + containerName;
             return await ExecuteAsync(cp);
         }
-        public async Task<StandardCmd> RmContainerFilesAsync(){
+        public async Task<StandardCmd> RmContainerFilesAsync()
+        {
             string rmFiles = "-c \"docker exec -i -w /opt/data " + containerName + " bash -c 'rm -fR *'\"";
             return await ExecuteAsync(rmFiles);
         }
@@ -391,27 +392,36 @@ namespace GrpcClient
         {
             StreamWriter sw = process.StandardInput;
             StreamReader sr = process.StandardOutput;
-            setStreamWriter(sw);
             string str = "";
-            int ch;
-            bool isTimeOut = true;
+            try
+            {
+                setStreamWriter(sw);
+                int ch;
+                bool isTimeOut = true;
 
-            var task = Task.Run(async () =>
-            {
-                str = await PrintOutAsync(process);
-                isTimeOut = false;
+                var task = Task.Run(async () =>
+                {
+                    str = await PrintOutAsync(process);
+                    isTimeOut = false;
 
-            });
-            int i = 0;
-            while (i++ < 6000 && isTimeOut)
-            {
-                await Task.Delay(10);
+                });
+                int i = 0;
+                while (i++ < 6000 && isTimeOut)
+                {
+                    await Task.Delay(10);
+                }
+                if (6000 <= i)
+                {
+                    process.Kill();
+                    return "this is time out";
+                }
             }
-            if (6000 <= i)
+            finally
             {
-                process.Kill();
-                return "this is time out";
+                sr.Close();
+                sw.Close();
             }
+
             return str;
         }
         private async Task<string> ProcessInOutAutoAsync(Process process)
@@ -425,10 +435,10 @@ namespace GrpcClient
 
             var task = Task.Run(async () =>
             {
+                StreamWriter sw = process.StandardInput;
+                StreamReader sr = process.StandardOutput;
                 try
                 {
-                    StreamWriter sw = process.StandardInput;
-                    StreamReader sr = process.StandardOutput;
                     bool isFirst = true;
                     while (true)
                     {
@@ -507,9 +517,10 @@ namespace GrpcClient
                     isTimeOut = false;
                     return str;
                 }
-                catch (Exception)
+                finally
                 {
-                    return "";
+                    sr.Close();
+                    sw.Close();
                 }
             });
             int j = 0;
@@ -529,13 +540,21 @@ namespace GrpcClient
             int ch;
             string str = "";
             StreamReader sr = process.StandardOutput;
-            while ((ch = sr.Read()) != -1)
+            try
             {
-                str = str + (char)ch;
-                // Console.Write((char)ch);
-                await Task.Delay(1);
-                requestWriteAsync(((char)ch).ToString());
+                while ((ch = sr.Read()) != -1)
+                {
+                    str = str + (char)ch;
+                    // Console.Write((char)ch);
+                    await Task.Delay(1);
+                    requestWriteAsync(((char)ch).ToString());
+                }
             }
+            finally
+            {
+                sr.Close();
+            }
+
             return str;
         }
         private async Task DownloadFileAsync(string url, string downloadPath)
@@ -584,9 +603,9 @@ namespace GrpcClient
         }
         private bool JudgeMainFile(string downloadPath)
         {
+            StreamReader sr = new StreamReader(downloadPath);
             try
             {
-                StreamReader sr = new StreamReader(downloadPath);
                 if (lang == "java11")
                 {
                     if (sr.ReadToEnd().ToLower().Contains("void main"))
@@ -602,9 +621,9 @@ namespace GrpcClient
                     }
                 }
             }
-            catch (Exception ex)
+            finally
             {
-                return false;
+                sr.Close();
             }
             return false;
         }
@@ -625,7 +644,8 @@ namespace GrpcClient
             {
                 mainFile = await JudgeMainFileUnzipAsync(directory);
             }
-            if(mainFile != "" && Path.GetFileName(Path.GetDirectoryName(mainFile)) != "data"){
+            if (mainFile != "" && Path.GetFileName(Path.GetDirectoryName(mainFile)) != "data")
+            {
                 string mv = "-c \"mv " + Path.GetDirectoryName(mainFile) + "/* " + downLoadPath;
                 await ExecuteAsync(mv);
                 string rm = "-c \"rm -fR " + Path.GetDirectoryName(mainFile);
