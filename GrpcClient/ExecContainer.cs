@@ -89,7 +89,7 @@ namespace GrpcClient
                             await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = submissionFileResult.Error, AnswerFile = "", Correction = 2 });
                         }
                     }
-                    //
+                    
                     Comparison comparison = new();
 
                     StandardCmd answerFileResult = await autoExec.AutoExecAsync(autoContainerArguments.AnswerFiles);
