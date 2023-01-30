@@ -16,9 +16,9 @@ internal class Program
             new GrpcChannelOptions { HttpHandler = httpHandler });
         var docker = new Docker.DockerClient(channel);
         SubmissionInformation SubmissionInformation = new SubmissionInformation();
-        SubmissionInformation.SubmissionFiles.Add(new FileInformation{FileName = "HelloWorld.java", FileId = "99"});
-        SubmissionInformation.AnswerFiles.Add(new FileInformation{FileName = "HelloWorld.java", FileId = "99"});
-        SubmissionInformation.Lang = "java11";
+        SubmissionInformation.SubmissionFiles.Add(new FileInformation{FileName = "HelloWorld.zip", FileId = "99"});
+        SubmissionInformation.AnswerFiles.Add(new FileInformation{FileName = "HelloWorld.zip", FileId = "99"});
+        SubmissionInformation.Lang = "clang";
         SubmissionInformation.MatchType = 1;
         SubmissionInformation.InputStr = "22\r\n30\r\n5\r\n8\r\n7";
         // Console.Write("ファイル名>");

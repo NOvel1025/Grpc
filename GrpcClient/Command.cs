@@ -46,23 +46,24 @@ namespace GrpcClient
         {
             StandardCmd result = new();
             string mainFile = "";
+            string downloadPath = "./executeFiles/" + containerName + "/data";
             for (int i = 0; i < 5; i++)
             {
                 if ((result = await BuildExecuteEnvironmentAsync()).ExitCode == 0)
                 {
                     foreach (FileInformation fileInformation in fileInformations)
                     {
-                        string downloadPath = "/home/kondo/executeFiles/" + containerName + "/data/" + fileInformation.FileName;
-                        await DownloadFileAsync("http://126.114.253.21:5556/api/GrpcDownload/"
-                        + fileInformation.FileId + "?apiKey=grpcdesu", downloadPath);
+                        string downloadFilePath = "./executeFiles/" + containerName + "/data/" + fileInformation.FileName;
+                        // await DownloadFileAsync("http://10.40.112.110:5556/api/GrpcDownload/"
+                        // + fileInformation.FileId + "?apiKey=grpcdesu", downloadPath);
                         if (fileInformation.FileName.ToLower().Contains("zip"))
                         {
-                            if ((result = await UnzipAsync(downloadPath)).ExitCode == 0)
+                            if ((result = await UnzipAsync(downloadFilePath)).ExitCode == 0)
                             {
-                                mainFile = await JudgeMainFileUnzipAsync(Path.GetDirectoryName(downloadPath));
+                                mainFile = Path.GetFileName(await JudgeMainFileUnzipAsync(Path.GetDirectoryName(downloadFilePath)));
                             }
                         }
-                        else if (JudgeMainFile(downloadPath))
+                        else if (JudgeMainFile(downloadFilePath))
                         {
                             mainFile = fileInformation.FileName;
                         }
@@ -74,16 +75,14 @@ namespace GrpcClient
                     }
                     else
                     {
-                        Console.WriteLine("-----1-----");
                         if (mainFile != "")
                         {
                             if (lang == "clang")
                             {
-                                result = await CompileClangAsync(fileInformations, mainFile);
+                                result = await CompileClangAsync(downloadPath, mainFile);
                             }
                             if (lang == "java11")
                             {
-                                Console.WriteLine("-----2-----");
                                 result = await CompileJavaAsync(mainFile);
                             }
                         }
@@ -111,19 +110,20 @@ namespace GrpcClient
             StandardCmd result = new();
             string mainFile = "";
             bool isZip = false;
+            string downloadPath = "./executeFiles/" + containerName + "/data";
             if ((result = await BuildExecuteEnvironmentAsync()).ExitCode == 0)
             {
                 foreach (FileInformation fileInformation in fileInformations)
                 {
-                    string downloadPath = "/home/kondo/executeFiles/" + containerName + "/data/" + fileInformation.FileName;
-                    await DownloadFileAsync("http://126.114.253.21:5556/api/GrpcDownload/"
-                        + fileInformation.FileId + "?apiKey=grpcdesu", downloadPath);
+                    string downloadFilePath = "./executeFiles/" + containerName + "/data/" + fileInformation.FileName;
+                    await DownloadFileAsync("http://10.40.112.110:5556/api/GrpcDownload/"
+                        + fileInformation.FileId + "?apiKey=grpcdesu", downloadFilePath);
                     if (fileInformation.FileName.ToLower().Contains("zip"))
                     {
                         isZip = true;
                         if ((result = await UnzipAsync(fileInformation.FileName)).ExitCode == 0)
                         {
-                            mainFile = await JudgeMainFileUnzipAsync("/home/kondo/executeFiles/" + containerName + "/data/");
+                            mainFile = await JudgeMainFileUnzipAsync("./executeFiles/" + containerName + "/data/");
                         }
                         else
                         {
@@ -132,7 +132,7 @@ namespace GrpcClient
                     }
                     else
                     {
-                        if (JudgeMainFile(downloadPath))
+                        if (JudgeMainFile(downloadFilePath))
                         {
                             mainFile = fileInformation.FileName;
                         }
@@ -151,7 +151,7 @@ namespace GrpcClient
                         {
                             if (lang == "clang")
                             {
-                                result = await CompileClangAsync(fileInformations, mainFile);
+                                result = await CompileClangAsync(downloadPath, mainFile);
                             }
                             if (lang == "java11")
                             {
@@ -197,7 +197,7 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> BuildContainerAsync()
         {
-            string build = "/home/kondo/bashfile/container.sh " + lang + " " + containerName;
+            string build = "./bashfile/container.sh " + lang + " " + containerName;
             return await ExecuteAsync(build);
         }
         public async Task<StandardCmd> StopContainerAsync()
@@ -212,12 +212,12 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> MkdirExecuteFoldersAsync()
         {
-            string mkdir = "/home/kondo/bashfile/mkdirExecuteFolder.sh " + containerName;
+            string mkdir = "./bashfile/mkdirExecuteFolder.sh " + containerName;
             return await ExecuteAsync(mkdir);
         }
         public async Task<StandardCmd> CpExecuteFoldersAsync()
         {
-            string cp = "/home/kondo/bashfile/cpExecuteFolder.sh " + lang + " " + containerName;
+            string cp = "./bashfile/cpExecuteFolder.sh " + lang + " " + containerName;
             return await ExecuteAsync(cp);
         }
         public async Task<StandardCmd> RmContainerFilesAsync()
@@ -227,7 +227,7 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> RmExecuteFoldersAsync()
         {
-            string rmFolder = "/home/kondo/bashfile/rmExecuteFolder.sh " + containerName;
+            string rmFolder = "./bashfile/rmExecuteFolder.sh " + containerName;
             return await ExecuteAsync(rmFolder);
         }
         public async Task<StandardCmd> CmdContainerAsync(string line)
@@ -283,7 +283,7 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> CompileJavaAsync(string fileName)
         {
-            string downloadPath = "/home/kondo/executeFiles/" + containerName + "/data/" + fileName;
+            string downloadPath = "./executeFiles/" + containerName + "/data/" + fileName;
             string encode = await judgeEncodeAsync(downloadPath);
             string className = Path.GetFileNameWithoutExtension(fileName);
             if (encode.ToLower().Contains("utf-8"))
@@ -306,14 +306,13 @@ namespace GrpcClient
             }
             return new StandardCmd("compile error", "compile error", -1);
         }
-        public async Task<StandardCmd> CompileClangAsync(FileInformation[] fileInformations, string mainFile)
+        public async Task<StandardCmd> CompileClangAsync(string downloadPath, string mainFile)
         {
-            string downloadPath = "/home/kondo/executeFiles/" + containerName + "/data/" + mainFile;
-            string encode = await judgeEncodeAsync(downloadPath);
+            string encode = await judgeEncodeAsync(downloadPath + "/" + mainFile);
             if (encode.ToLower().Contains("utf-8"))
             {
                 string compile = "-c \"docker exec -w /opt/bin " + containerName + " bash compile.sh ";
-                compile = GenerateCompileString(fileInformations, mainFile, compile);
+                compile = GenerateCompileString(downloadPath, mainFile, compile);
                 StandardCmd compileResult = await ExecuteAsync(compile);
                 if (compileResult.ExitCode == 0)
                 {
@@ -323,7 +322,7 @@ namespace GrpcClient
             if (encode.ToLower().Contains("sjis"))
             {
                 string compileSjis = "-c \"docker exec -w /opt/bin " + containerName + " bash compile_sjis.sh ";
-                compileSjis = GenerateCompileString(fileInformations, mainFile, compileSjis);
+                compileSjis = GenerateCompileString(downloadPath, mainFile, compileSjis);
                 StandardCmd compileSjisResult = await ExecuteAsync(compileSjis);
                 if (compileSjisResult.ExitCode == 0)
                 {
@@ -418,8 +417,8 @@ namespace GrpcClient
             }
             finally
             {
-                sr.Close();
-                sw.Close();
+                // sr.Close();
+                // sw.Close();
             }
 
             return str;
@@ -519,8 +518,8 @@ namespace GrpcClient
                 }
                 finally
                 {
-                    sr.Close();
-                    sw.Close();
+                    // sr.Close();
+                    // sw.Close();
                 }
             });
             int j = 0;
@@ -552,7 +551,7 @@ namespace GrpcClient
             }
             finally
             {
-                sr.Close();
+                // sr.Close();
             }
 
             return str;
@@ -624,13 +623,14 @@ namespace GrpcClient
             }
             finally
             {
-                sr.Close();
+                // sr.Close();
             }
             return false;
         }
         private async Task<string> JudgeMainFileUnzipAsync(string downLoadPath)
         {
             string mainFile = "";
+
             string[] files = Directory.GetFiles(downLoadPath);
             foreach (string file in files)
             {
@@ -652,26 +652,54 @@ namespace GrpcClient
                 string rm = "-c \"rm -fR " + Path.GetDirectoryName(mainFile);
                 await ExecuteAsync(rm);
             }
-            return Path.GetFileName(mainFile);
+
+            return mainFile;
         }
-        private string GenerateCompileString(FileInformation[] fileInformations, string mainFile, string compile)
+        private string GenerateCompileString(string downloadPath, string mainFile, string compile)
         {
-            foreach (FileInformation fileInformation in fileInformations)
+            List<string> filesPath = GetFilesPath(downloadPath);
+            foreach (string filePath in filesPath)
             {
-                if (fileInformation.FileName == mainFile)
+                if (Path.GetFileName(filePath) == mainFile)
                 {
-                    compile += ("../data/" + mainFile.Split(".")[0] + " ");
+                    compile += ("../data/" + Path.GetFileNameWithoutExtension(mainFile) + " ");
                     break;
                 }
             }
-            foreach (FileInformation fileInformation in fileInformations)
-            {
-                compile += ("../data/" + fileInformation.FileName + " ");
+            foreach(string filePath in filesPath){
+                if (Path.GetFileName(filePath) == mainFile)
+                {
+                    compile += ("../data/" + Path.GetFileName(mainFile) + " ");
+                    break;
+                }
+                else
+                {
+                    if (Path.GetExtension(filePath) == ".c")
+                    {
+                        compile += ("../data/" + Path.GetFileName(filePath) + " ");
+                    }
+                }
             }
             compile.TrimEnd();
             compile += "\"";
             return compile;
         }
+        private List<string> GetFilesPath(string path)
+        {
+            List<string> filePath = new List<string>();
+            string[] files = Directory.GetFiles(path);
+            foreach (string file in files)
+            {
+                filePath.Add(file);
+            }
+            string[] directories = Directory.GetDirectories(path);
+            foreach (string directory in directories)
+            {
+                foreach(string file in GetFilesPath(directory)){
+                    filePath.Add(file);
+                }
+            }
+            return filePath;
+        }
     }
 }
-
