@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+option csharp_namespace = "GrpcEClientAuto";
+import "google/protobuf/empty.proto";
+package docker;
+
+service Docker{
+    //自動実行用のファイル情報送信　引数：実行結果　戻り値：ファイル情報
+    rpc AutoExecStream(stream ExecutionResult) returns (stream SubmissionInformation);
+    //自動実行依頼送信　引数：ファイル情報　戻り値：実行結果
+    rpc AutoExec(SubmissionInformation) returns (ExecutionResult);
+    //手動実行リクエスト用の待機サーバーストリーム　引数：なし　戻り値：ファイル情報
+    rpc ManualRequest(google.protobuf.Empty) returns (stream SubmissionInformation);
+    //手動実行ストリーム　引数：手動実行出力　戻り値：手動実行入力
+    rpc ManualExecStream(stream ExecutionOutput) returns (stream ExecutionInput);
+    //手動実行ストリームEX2のクライアント側との通信　引数：ファイル情報　戻り値：手動実行出力
+    rpc ManualEClientStream(stream SubmissionInformation) returns (stream ExecutionOutput);
+}
+//ファイル情報　
+//fileName：ファイル名　submissionFileId：提出ファイルのID　answerFileId：回答ファイルのID　lang：言語　matchType：比較方法　inputStr：入力文字列
+message SubmissionInformation{
+    repeated FileInformation submissionFiles = 1;
+    repeated FileInformation answerFiles = 2;
+    string lang = 3;
+    int32 matchType = 4;
+    string inputStr = 5;
+}
+message FileInformation{
+    string fileName = 1;
+    string fileId = 2;
+}
+//実行結果　submissionFile：提出ファイルの実行結果　answerFile：回答ファイルの実行結果　correction：成否
+message ExecutionResult{
+    string submissionFile = 1;
+    string answerFile = 2;
+    int32 correction = 3;
+}
+//手動実行入力　executionInputStr：入力文字列
+message ExecutionInput{
+    string executionInputStr = 1;
+}
+//手動実行出力　executionOutputStr：出力文字列
+message ExecutionOutput{
+    string executionOutputStr = 1;
+}
