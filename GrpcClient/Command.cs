@@ -12,87 +12,89 @@ namespace GrpcClient
 {
     public class Command
     {
-        private string containerName = "";
-        private string lang = "";
-        private bool isAuto = false;
-        private string inputStr = "";
-        private string path = "/opt/data";
-        private Func<string, Task> requestWriteAsync;
-        private Action<StreamWriter> setStreamWriter;
-        private string[] notCompileLanguage = new string[]{
+        
+        /// <summary>
+        /// コンテナ名、コンテナを生成するときにautoかmanualに言語、番号をつけて生成
+        /// </summary>
+        private string _containerName = "";
+        /// <summary>
+        /// 言語
+        /// </summary>
+        private string _lang = "";
+        /// <summary>
+        /// 自動実行用か手動実行用
+        /// </summary>
+        private bool _isAuto = false;
+        private string _inputStr = "";
+        private string _path = "/opt/data";
+        private string _ex2PlusUrl = "http://10.40.112.110:5556/api/GrpcDownload/";
+        private string _apiKey = "?apiKey=grpcdesu";
+        private Func<string, Task> _requestWriteAsync;
+        private Action<StreamWriter> _setStreamWriter;
+        private string[] _notCompileLanguage = new string[]{
             "php", "python3"
         };
         public Command() { }
         public Command(string containerName, string lang)
         {
-            this.containerName = containerName;
-            this.lang = lang;
+            this._containerName = containerName;
+            this._lang = lang;
         }
         public Command(string containerName, string lang, bool isAuto, string inputStr)
         {
-            this.containerName = containerName;
-            this.lang = lang;
-            this.isAuto = isAuto;
-            this.inputStr = inputStr;
+            this._containerName = containerName;
+            this._lang = lang;
+            this._isAuto = isAuto;
+            this._inputStr = inputStr;
         }
         public Command(string containerName, string lang, Func<string, Task> requestWriteAsync, Action<StreamWriter> setStreamWriter)
         {
-            this.requestWriteAsync = requestWriteAsync;
-            this.setStreamWriter = setStreamWriter;
-            this.containerName = containerName;
-            this.lang = lang;
+            this._requestWriteAsync = requestWriteAsync;
+            this._setStreamWriter = setStreamWriter;
+            this._containerName = containerName;
+            this._lang = lang;
         }
         public async Task<StandardCmd> AutoExecAsync(FileInformation[] fileInformations)
         {
             StandardCmd result = new();
             string mainFile = "";
-            string downloadPath = "./executeFiles/" + containerName + "/data";
+            string directoryPath = "./executeFiles/" + _containerName + "/data";
             for (int i = 0; i < 5; i++)
             {
                 if ((result = await BuildExecuteEnvironmentAsync()).ExitCode == 0)
                 {
                     foreach (FileInformation fileInformation in fileInformations)
                     {
-                        string downloadFilePath = "./executeFiles/" + containerName + "/data/" + fileInformation.FileName;
-                        await DownloadFileAsync("http://10.40.112.110:5556/api/GrpcDownload/"
-                        + fileInformation.FileId + "?apiKey=grpcdesu", downloadFilePath);
+                        string filePath = directoryPath + "/" + fileInformation.FileName;
+                        await DownloadFileAsync(_ex2PlusUrl + fileInformation.FileId + _apiKey, filePath);
                         if (fileInformation.FileName.ToLower().Contains("zip"))
                         {
-                            if ((result = await UnzipAsync(downloadFilePath)).ExitCode == 0)
+                            if ((result = await UnzipAsync(filePath)).ExitCode == 0)
                             {
-                                mainFile = Path.GetFileName(await JudgeMainFileUnzipAsync(Path.GetDirectoryName(downloadFilePath)));
+                                mainFile = Path.GetFileName(await JudgeUnzipMainFileAsync(directoryPath));
                             }
                         }
-                        else if (JudgeMainFile(downloadFilePath))
+                        else if (JudgeMainFile(filePath))
                         {
                             mainFile = fileInformation.FileName;
                         }
                     }
-                    Console.WriteLine("------" + mainFile + "-----");
-                    if (notCompileLanguage.Any(value => value == lang) && mainFile == "")
+                    if (_notCompileLanguage.Any(value => value == _lang) && mainFile == "")
                     {
-                        foreach (FileInformation fileInformation in fileInformations)
+                        if ((mainFile = JudgeMainFile(fileInformations)) == "")
                         {
-                            if (Path.GetExtension(fileInformation.FileName) == ".py")
-                            {
-                                mainFile = fileInformation.FileName;
-                            }
-                            if (Path.GetExtension(fileInformation.FileName) == ".php")
-                            {
-                                mainFile = fileInformation.FileName;
-                            }
+                            return new StandardCmd("File not found.", "File not found.", -1);
                         }
-                        return new StandardCmd("File not found.", "File not found.", -1);
                     }
                     else
                     {
                         if (mainFile != "")
                         {
-                            if (lang == "clang")
+                            if (_lang == "clang")
                             {
-                                result = await CompileClangAsync(downloadPath, mainFile);
+                                result = await CompileClangAsync(directoryPath, mainFile);
                             }
-                            if (lang == "java11")
+                            if (_lang == "java11")
                             {
                                 result = await CompileJavaAsync(mainFile);
                             }
@@ -121,20 +123,19 @@ namespace GrpcClient
             StandardCmd result = new();
             string mainFile = "";
             bool isZip = false;
-            string downloadPath = "./executeFiles/" + containerName + "/data";
+            string directoryPath = "./executeFiles/" + _containerName + "/data";
             if ((result = await BuildExecuteEnvironmentAsync()).ExitCode == 0)
             {
                 foreach (FileInformation fileInformation in fileInformations)
                 {
-                    string downloadFilePath = "./executeFiles/" + containerName + "/data/" + fileInformation.FileName;
-                    await DownloadFileAsync("http://10.40.112.110:5556/api/GrpcDownload/"
-                        + fileInformation.FileId + "?apiKey=grpcdesu", downloadFilePath);
+                    string filePath = directoryPath + "/" + fileInformation.FileName;
+                    await DownloadFileAsync(_ex2PlusUrl + fileInformation.FileId + _apiKey, filePath);
                     if (fileInformation.FileName.ToLower().Contains("zip"))
                     {
                         isZip = true;
-                        if ((result = await UnzipAsync(downloadFilePath)).ExitCode == 0)
+                        if ((result = await UnzipAsync(filePath)).ExitCode == 0)
                         {
-                            mainFile = Path.GetFileName(await JudgeMainFileUnzipAsync(Path.GetDirectoryName(downloadFilePath)));
+                            mainFile = Path.GetFileName(await JudgeUnzipMainFileAsync(directoryPath));
                         }
                         else
                         {
@@ -143,26 +144,18 @@ namespace GrpcClient
                     }
                     else
                     {
-                        if (JudgeMainFile(downloadFilePath))
+                        if (JudgeMainFile(filePath))
                         {
                             mainFile = fileInformation.FileName;
                         }
                     }
                 }
-                if (notCompileLanguage.Any(value => value == lang) && mainFile == "")
+                if (_notCompileLanguage.Any(value => value == _lang) && mainFile == "")
                 {
-                    foreach (FileInformation fileInformation in fileInformations)
+                    if ((mainFile = JudgeMainFile(fileInformations)) == "")
                     {
-                        if (Path.GetExtension(fileInformation.FileName) == ".py")
-                        {
-                            mainFile = fileInformation.FileName;
-                        }
-                        if (Path.GetExtension(fileInformation.FileName) == ".php")
-                        {
-                            mainFile = fileInformation.FileName;
-                        }
+                        return new StandardCmd("File not found.", "File not found.", -1);
                     }
-                    return new StandardCmd("File not found.", "File not found.", -1);
                 }
                 else
                 {
@@ -171,18 +164,18 @@ namespace GrpcClient
                     {
                         if (mainFile != "")
                         {
-                            if (lang == "clang")
+                            if (_lang == "clang")
                             {
-                                result = await CompileClangAsync(downloadPath, mainFile);
+                                result = await CompileClangAsync(directoryPath, mainFile);
                             }
-                            if (lang == "java11")
+                            if (_lang == "java11")
                             {
                                 result = await CompileJavaAsync(mainFile);
                             }
                         }
                         else
                         {
-                            result = new StandardCmd("File not found.", "File not found.", -1);
+                            return new StandardCmd("File not found.", "File not found.", -1);
                         }
                     }
                 }
@@ -219,37 +212,37 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> BuildContainerAsync()
         {
-            string build = "./bashfile/container.sh " + lang + " " + containerName;
+            string build = "./bashfile/container.sh " + _lang + " " + _containerName;
             return await ExecuteAsync(build);
         }
         public async Task<StandardCmd> StopContainerAsync()
         {
-            string cmdStr = "-c \"docker stop -t 0 " + containerName + " \"";
+            string cmdStr = "-c \"docker stop -t 0 " + _containerName + " \"";
             return await ExecuteAsync(cmdStr);
         }
         public async Task<StandardCmd> RmContainerAsync()
         {
-            string cmdStr = "-c \"docker rm " + containerName + " \"";
+            string cmdStr = "-c \"docker rm " + _containerName + " \"";
             return await ExecuteAsync(cmdStr);
         }
         public async Task<StandardCmd> MkdirExecuteFoldersAsync()
         {
-            string mkdir = "./bashfile/mkdirExecuteFolder.sh " + containerName;
+            string mkdir = "./bashfile/mkdirExecuteFolder.sh " + _containerName;
             return await ExecuteAsync(mkdir);
         }
         public async Task<StandardCmd> CpExecuteFoldersAsync()
         {
-            string cp = "./bashfile/cpExecuteFolder.sh " + lang + " " + containerName;
+            string cp = "./bashfile/cpExecuteFolder.sh " + _lang + " " + _containerName;
             return await ExecuteAsync(cp);
         }
         public async Task<StandardCmd> RmContainerFilesAsync()
         {
-            string rmFiles = "-c \"docker exec -i -w /opt/data " + containerName + " bash -c 'rm -fR *'\"";
+            string rmFiles = "-c \"docker exec -i -w /opt/data " + _containerName + " bash -c 'rm -fR *'\"";
             return await ExecuteAsync(rmFiles);
         }
         public async Task<StandardCmd> RmExecuteFoldersAsync()
         {
-            string rmFolder = "./bashfile/rmExecuteFolder.sh " + containerName;
+            string rmFolder = "./bashfile/rmExecuteFolder.sh " + _containerName;
             return await ExecuteAsync(rmFolder);
         }
         public async Task<StandardCmd> CmdContainerAsync(string line)
@@ -260,37 +253,37 @@ namespace GrpcClient
             }
             else
             {
-                string cmdStr = "-c \"docker exec -i -w " + path + " " + containerName + " bash -c '" + line + "'\"";
+                string cmdStr = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c '" + line + "'\"";
                 return await ExecuteAsync(cmdStr);
             }
         }
         public async Task<StandardCmd> CdAsync(string line)
         {
-            string cmdStr = "-c \"docker exec -i -w " + path + " " + containerName + " bash -c '" + line + " && pwd'\"";
+            string cmdStr = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c '" + line + " && pwd'\"";
             StandardCmd standardCmd = await ExecuteAsync(cmdStr);
             if (standardCmd.ExitCode == 0)
             {
-                path = standardCmd.Output.Trim();
+                _path = standardCmd.Output.Trim();
             }
             return standardCmd;
 
         }
         public async Task<StandardCmd> CurrentDirectoryContainerAsync()
         {
-            string pwd = "-c \"docker exec -i -w " + path + " " + containerName + " bash -c 'basename `pwd`'\"";
+            string pwd = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c 'basename `pwd`'\"";
             StandardCmd pwdResult = await ExecuteAsync(pwd);
             return pwdResult;
         }
-        public async Task<StandardCmd> UnzipAsync(string downLoadPath)
+        public async Task<StandardCmd> UnzipAsync(string filePath)
         {
-            string unzipPath = Path.GetDirectoryName(downLoadPath);
-            string unzip = "-c \"unzip -d " + unzipPath + " " + downLoadPath + "\"";
+            string unzipPath = Path.GetDirectoryName(filePath);
+            string unzip = "-c \"unzip -d " + unzipPath + " " + filePath + "\"";
             StandardCmd unzipResult = await ExecuteAsync(unzip);
             if (unzipResult.ExitCode != 0)
             {
                 return unzipResult;
             }
-            string rmzip = "-c \"rm -fR " + downLoadPath + "\"";
+            string rmzip = "-c \"rm -fR " + filePath + "\"";
             StandardCmd rmzipResult = await ExecuteAsync(rmzip);
             if (rmzipResult.ExitCode != 0)
             {
@@ -300,17 +293,17 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> RmAsync(string fileName)
         {
-            string cmdStr = "-c \"docker exec -i -w /opt/data " + containerName + " bash -c 'rm -Rf " + fileName + "\"";
+            string cmdStr = "-c \"docker exec -i -w /opt/data " + _containerName + " bash -c 'rm -Rf " + fileName + "\"";
             return await ExecuteAsync(cmdStr);
         }
         public async Task<StandardCmd> CompileJavaAsync(string fileName)
         {
-            string downloadPath = "./executeFiles/" + containerName + "/data/" + fileName;
+            string downloadPath = "./executeFiles/" + _containerName + "/data/" + fileName;
             string encode = await judgeEncodeAsync(downloadPath);
             string className = Path.GetFileNameWithoutExtension(fileName);
             if (encode.ToLower().Contains("utf-8"))
             {
-                string compile = "-c \"docker exec -w /opt/bin " + containerName + " bash compile.sh " + className + "\"";
+                string compile = "-c \"docker exec -w /opt/bin " + _containerName + " bash compile.sh " + className + "\"";
                 StandardCmd compileResult = await ExecuteAsync(compile);
                 if (compileResult.ExitCode == 0)
                 {
@@ -319,7 +312,7 @@ namespace GrpcClient
             }
             if (encode.ToLower().Contains("sjis"))
             {
-                string compileSjis = "-c \"docker exec -w /opt/bin " + containerName + " bash compile_sjis.sh " + className + "\"";
+                string compileSjis = "-c \"docker exec -w /opt/bin " + _containerName + " bash compile_sjis.sh " + className + "\"";
                 StandardCmd compileSjisResult = await ExecuteAsync(compileSjis);
                 if (compileSjisResult.ExitCode == 0)
                 {
@@ -328,13 +321,13 @@ namespace GrpcClient
             }
             return new StandardCmd("compile error", "compile error", -1);
         }
-        public async Task<StandardCmd> CompileClangAsync(string downloadPath, string mainFile)
+        public async Task<StandardCmd> CompileClangAsync(string directoryPath, string mainFile)
         {
-            string encode = await judgeEncodeAsync(downloadPath + "/" + mainFile);
+            string encode = await judgeEncodeAsync(directoryPath + "/" + mainFile);
             if (encode.ToLower().Contains("utf-8"))
             {
-                string compile = "-c \"docker exec -w /opt/bin " + containerName + " bash compile.sh ";
-                compile = GenerateCompileString(downloadPath, mainFile, compile);
+                string compile = "-c \"docker exec -w /opt/bin " + _containerName + " bash compile.sh ";
+                compile = GenerateCompileString(directoryPath, mainFile, compile);
                 StandardCmd compileResult = await ExecuteAsync(compile);
                 if (compileResult.ExitCode == 0)
                 {
@@ -343,8 +336,8 @@ namespace GrpcClient
             }
             if (encode.ToLower().Contains("sjis"))
             {
-                string compileSjis = "-c \"docker exec -w /opt/bin " + containerName + " bash compile_sjis.sh ";
-                compileSjis = GenerateCompileString(downloadPath, mainFile, compileSjis);
+                string compileSjis = "-c \"docker exec -w /opt/bin " + _containerName + " bash compile_sjis.sh ";
+                compileSjis = GenerateCompileString(directoryPath, mainFile, compileSjis);
                 StandardCmd compileSjisResult = await ExecuteAsync(compileSjis);
                 if (compileSjisResult.ExitCode == 0)
                 {
@@ -357,7 +350,7 @@ namespace GrpcClient
         {
             string mainFilePath = Path.GetDirectoryName(fileName) == "" ? "" : "/" + Path.GetDirectoryName(fileName);
             string className = Path.GetFileNameWithoutExtension(fileName);
-            string cmdStr = "-c \"docker exec -i -w /opt/bin" + mainFilePath + " " + containerName + " bash -c 'bash execute.sh " + className + "'\"";
+            string cmdStr = "-c \"docker exec -i -w /opt/bin" + mainFilePath + " " + _containerName + " bash -c 'bash execute.sh " + className + "'\"";
             return await ExecuteAsync(cmdStr);
         }
         private async Task<StandardCmd> ExecuteAsync(string cmdStr)
@@ -383,7 +376,7 @@ namespace GrpcClient
 
                 string str = "";
 
-                if (isAuto)
+                if (_isAuto)
                 {
                     str = await ProcessInOutAutoAsync(process);
                 }
@@ -416,7 +409,7 @@ namespace GrpcClient
             string str = "";
             try
             {
-                setStreamWriter(sw);
+                _setStreamWriter(sw);
                 int ch;
                 bool isTimeOut = true;
 
@@ -448,7 +441,7 @@ namespace GrpcClient
         private async Task<string> ProcessInOutAutoAsync(Process process)
         {
             string str = "";
-            string[] strIn = inputStr.Split("\n");
+            string[] strIn = _inputStr.Split("\n");
             string strOut = "";
             int ch = -1;
             int i = 0;
@@ -568,7 +561,7 @@ namespace GrpcClient
                     str = str + (char)ch;
                     // Console.Write((char)ch);
                     await Task.Delay(1);
-                    requestWriteAsync(((char)ch).ToString());
+                    _requestWriteAsync(((char)ch).ToString());
                 }
             }
             finally
@@ -598,7 +591,6 @@ namespace GrpcClient
         {
             try
             {
-
                 FileInfo file = new FileInfo(downloadPath);
                 string name = "";
                 // ファイル自動判別読み出しクラスを生成
@@ -607,9 +599,9 @@ namespace GrpcClient
                     // 判別読み出し実行。判別結果はReadメソッドの戻り値で把握できます
                     try
                     {
-                        Hnx8.ReadJEnc.CharCode c = reader.Read(file);
+                        Hnx8.ReadJEnc.CharCode charCode = reader.Read(file);
                         // 戻り値のNameプロパティから文字コード名を取得できます
-                        name = c.Name;
+                        name = charCode.Name;
                     }
                     catch (System.NotSupportedException)
                     {
@@ -623,26 +615,25 @@ namespace GrpcClient
                 return "not Found File";
             }
         }
-        private bool JudgeMainFile(string downloadPath)
+        private bool JudgeMainFile(string filePath)
         {
-            StreamReader sr = new StreamReader(downloadPath);
-            try
+            using (StreamReader sr = new StreamReader(filePath))
             {
-                if (lang == "java11")
+                if (_lang == "java11")
                 {
                     if (sr.ReadToEnd().ToLower().Contains("void main"))
                     {
                         return true;
                     }
                 }
-                if (lang == "clang")
+                if (_lang == "clang")
                 {
                     if (sr.ReadToEnd().ToLower().Contains("main("))
                     {
                         return true;
                     }
                 }
-                if (lang == "python3")
+                if (_lang == "python3")
                 {
                     if (sr.ReadToEnd().ToLower().Contains("if __name__ == '__main__'"))
                     {
@@ -650,33 +641,40 @@ namespace GrpcClient
                     }
                 }
             }
-            finally
-            {
-                // sr.Close();
-            }
             return false;
         }
-        private async Task<string> JudgeMainFileUnzipAsync(string downLoadPath)
+        private string JudgeMainFile(FileInformation[] fileInformations)
         {
             string mainFile = "";
-
-            string[] files = Directory.GetFiles(downLoadPath);
-            foreach (string file in files)
+            foreach (FileInformation fileInformation in fileInformations)
             {
-                if (JudgeMainFile(file))
+                if (_lang == "python3" && Path.GetExtension(fileInformation.FileName) == ".py")
                 {
-                    return file;
+                    mainFile = fileInformation.FileName;
+                    break;
+                }
+                if (_lang == "php" && Path.GetExtension(fileInformation.FileName) == ".php")
+                {
+                    mainFile = fileInformation.FileName;
+                    break;
                 }
             }
-
-            string[] directories = Directory.GetDirectories(downLoadPath);
-            foreach (string directory in directories)
+            return mainFile;
+        }
+        private async Task<string> JudgeUnzipMainFileAsync(string directoryPath)
+        {
+            string mainFile = "";
+            List<string> filePaths = GetFilePaths(directoryPath);
+            foreach (string filePath in filePaths)
             {
-                mainFile = await JudgeMainFileUnzipAsync(directory);
+                if (JudgeMainFile(filePath))
+                {
+                    mainFile = filePath;
+                }
             }
             if (mainFile != "" && Path.GetFileName(Path.GetDirectoryName(mainFile)) != "data")
             {
-                string mv = "-c \"mv " + Path.GetDirectoryName(mainFile) + "/* " + downLoadPath;
+                string mv = "-c \"mv " + Path.GetDirectoryName(mainFile) + "/* " + directoryPath;
                 await ExecuteAsync(mv);
                 string rm = "-c \"rm -fR " + Path.GetDirectoryName(mainFile);
                 await ExecuteAsync(rm);
@@ -686,7 +684,7 @@ namespace GrpcClient
         }
         private string GenerateCompileString(string downloadPath, string mainFile, string compile)
         {
-            List<string> filesPath = GetFilesPath(downloadPath);
+            List<string> filesPath = GetFilePaths(downloadPath);
             foreach (string filePath in filesPath)
             {
                 if (Path.GetFileName(filePath) == mainFile)
@@ -714,23 +712,23 @@ namespace GrpcClient
             compile += "\"";
             return compile;
         }
-        private List<string> GetFilesPath(string path)
+        private List<string> GetFilePaths(string path)
         {
-            List<string> filePath = new List<string>();
+            List<string> filePaths = new List<string>();
             string[] files = Directory.GetFiles(path);
             foreach (string file in files)
             {
-                filePath.Add(file);
+                filePaths.Add(file);
             }
             string[] directories = Directory.GetDirectories(path);
             foreach (string directory in directories)
             {
-                foreach (string file in GetFilesPath(directory))
+                foreach (string file in GetFilePaths(directory))
                 {
-                    filePath.Add(file);
+                    filePaths.Add(file);
                 }
             }
-            return filePath;
+            return filePaths;
         }
     }
 }

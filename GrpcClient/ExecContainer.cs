@@ -49,7 +49,6 @@ namespace GrpcClient
         {
             try
             {
-
                 if (server == null)
                 {
                     Console.WriteLine("serverがnullです。");
@@ -64,6 +63,7 @@ namespace GrpcClient
                         await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = "not available language.", AnswerFile = "not available language.", Correction = 0 });
                         continue;
                     }
+                    
                     Command autoExec = new Command(autoContainerArguments.ContainerName, autoContainerArguments.Lang, true, autoContainerArguments.InputStr);
                     StandardCmd submissionFileResult = await autoExec.AutoExecAsync(autoContainerArguments.SubmissionFiles);
                     if (autoContainerArguments.MatchType == 0)
@@ -73,9 +73,15 @@ namespace GrpcClient
                             await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = submissionFileResult.Output, AnswerFile = "", Correction = 0 });
                             continue;
                         }
+                        else if(autoContainerArguments.IsZip)
+                        {
+                            await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = submissionFileResult.Error, AnswerFile = "", Correction = 0 });
+                            continue;
+                        }
                         else
                         {
                             await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = submissionFileResult.Error, AnswerFile = "", Correction = 2 });
+                            continue;
                         }
                     }
                     

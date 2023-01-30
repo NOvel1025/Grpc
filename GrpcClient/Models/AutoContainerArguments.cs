@@ -19,7 +19,18 @@ namespace GrpcClient.Models
             };
             Correction = 0;
             CorrectionBool = false;
-            IsZip = false;
+            foreach (FileInformation fileInformation in SubmissionFiles)
+            {
+                if (fileInformation.FileName.ToLower().Contains("zip"))
+                {
+                    IsZip = true;
+                    break;
+                }
+                else
+                {
+                    IsZip = false;
+                }
+            }
         }
         public FileInformation[] SubmissionFiles { get; set; }
         public FileInformation[] AnswerFiles { get; set; }
@@ -27,7 +38,7 @@ namespace GrpcClient.Models
         public int MatchType { get; set; }
         public string InputStr { get; set; }
         public int SubmissionFileCount { get; set; }
-        public int AnswerFileCount{ get; set; }
+        public int AnswerFileCount { get; set; }
         public string ContainerName { get; set; }
         public string SubmissionFileResult { get; set; }
         public string AnswerFileResult { get; set; }
