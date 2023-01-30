@@ -1,2 +1,0 @@
-/home/dotnet/Grpc/GrpcClient/bin/Debug/net6.0/linux-x64/publish/grpcClient.pdb
-/home/dotnet/Grpc/GrpcClient/bin/Debug/net6.0/linux-x64/publish/grpcClient

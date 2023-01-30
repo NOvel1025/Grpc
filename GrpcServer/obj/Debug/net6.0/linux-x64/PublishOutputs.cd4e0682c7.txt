@@ -1,4 +1,0 @@
-/home/dotnet/Grpc/GrpcServer/bin/Debug/net6.0/linux-x64/publish/appsettings.Development.json
-/home/dotnet/Grpc/GrpcServer/bin/Debug/net6.0/linux-x64/publish/appsettings.json
-/home/dotnet/Grpc/GrpcServer/bin/Debug/net6.0/linux-x64/publish/grpcServer.pdb
-/home/dotnet/Grpc/GrpcServer/bin/Debug/net6.0/linux-x64/publish/grpcServer

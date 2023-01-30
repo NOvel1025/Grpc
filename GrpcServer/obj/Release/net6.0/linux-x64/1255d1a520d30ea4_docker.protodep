@@ -1,3 +1,0 @@
-obj/Release/net6.0/linux-x64/Protos/Docker.cs \
-obj/Release/net6.0/linux-x64/Protos/DockerGrpc.cs: /home/dotnet/.nuget/packages/grpc.tools/2.50.0/build/native/include/google/protobuf/empty.proto\
- Protos/docker.proto
