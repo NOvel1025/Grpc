@@ -54,8 +54,8 @@ namespace GrpcClient
                     foreach (FileInformation fileInformation in fileInformations)
                     {
                         string downloadFilePath = "./executeFiles/" + containerName + "/data/" + fileInformation.FileName;
-                        // await DownloadFileAsync("http://10.40.112.110:5556/api/GrpcDownload/"
-                        // + fileInformation.FileId + "?apiKey=grpcdesu", downloadPath);
+                        await DownloadFileAsync("http://10.40.112.110:5556/api/GrpcDownload/"
+                        + fileInformation.FileId + "?apiKey=grpcdesu", downloadFilePath);
                         if (fileInformation.FileName.ToLower().Contains("zip"))
                         {
                             if ((result = await UnzipAsync(downloadFilePath)).ExitCode == 0)
@@ -69,9 +69,20 @@ namespace GrpcClient
                         }
                     }
                     Console.WriteLine("------" + mainFile + "-----");
-                    if (notCompileLanguage.Any(value => value == lang))
+                    if (notCompileLanguage.Any(value => value == lang) && mainFile == "")
                     {
-                        mainFile = fileInformations[0].FileName;
+                        foreach (FileInformation fileInformation in fileInformations)
+                        {
+                            if (Path.GetExtension(fileInformation.FileName) == ".py")
+                            {
+                                mainFile = fileInformation.FileName;
+                            }
+                            if (Path.GetExtension(fileInformation.FileName) == ".php")
+                            {
+                                mainFile = fileInformation.FileName;
+                            }
+                        }
+                        return new StandardCmd("File not found.", "File not found.", -1);
                     }
                     else
                     {
@@ -121,9 +132,9 @@ namespace GrpcClient
                     if (fileInformation.FileName.ToLower().Contains("zip"))
                     {
                         isZip = true;
-                        if ((result = await UnzipAsync(fileInformation.FileName)).ExitCode == 0)
+                        if ((result = await UnzipAsync(downloadFilePath)).ExitCode == 0)
                         {
-                            mainFile = await JudgeMainFileUnzipAsync("./executeFiles/" + containerName + "/data/");
+                            mainFile = Path.GetFileName(await JudgeMainFileUnzipAsync(Path.GetDirectoryName(downloadFilePath)));
                         }
                         else
                         {
@@ -138,9 +149,20 @@ namespace GrpcClient
                         }
                     }
                 }
-                if (notCompileLanguage.Any(value => value == lang))
+                if (notCompileLanguage.Any(value => value == lang) && mainFile == "")
                 {
-                    mainFile = fileInformations[0].FileName;
+                    foreach (FileInformation fileInformation in fileInformations)
+                    {
+                        if (Path.GetExtension(fileInformation.FileName) == ".py")
+                        {
+                            mainFile = fileInformation.FileName;
+                        }
+                        if (Path.GetExtension(fileInformation.FileName) == ".php")
+                        {
+                            mainFile = fileInformation.FileName;
+                        }
+                    }
+                    return new StandardCmd("File not found.", "File not found.", -1);
                 }
                 else
                 {
@@ -620,6 +642,13 @@ namespace GrpcClient
                         return true;
                     }
                 }
+                if (lang == "python3")
+                {
+                    if (sr.ReadToEnd().ToLower().Contains("if __name__ == '__main__'"))
+                    {
+                        return true;
+                    }
+                }
             }
             finally
             {
@@ -666,7 +695,8 @@ namespace GrpcClient
                     break;
                 }
             }
-            foreach(string filePath in filesPath){
+            foreach (string filePath in filesPath)
+            {
                 if (Path.GetFileName(filePath) == mainFile)
                 {
                     compile += ("../data/" + Path.GetFileName(mainFile) + " ");
@@ -695,7 +725,8 @@ namespace GrpcClient
             string[] directories = Directory.GetDirectories(path);
             foreach (string directory in directories)
             {
-                foreach(string file in GetFilesPath(directory)){
+                foreach (string file in GetFilesPath(directory))
+                {
                     filePath.Add(file);
                 }
             }
