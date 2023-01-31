@@ -22,9 +22,8 @@ public class DockerService : Docker.DockerBase
     {
         
         Console.WriteLine("-----自動実行接続完了-----");
-        await _con.ConnectServer(req, res);
+        _con.ConnectServer(req, res);
         while(true){await Task.Delay(10000);}
-        Console.WriteLine("-----接続終了-----");
     }
     public override async Task<ExecutionResult> AutoExec(SubmissionInformation req, ServerCallContext context)
     {
@@ -34,7 +33,7 @@ public class DockerService : Docker.DockerBase
     }
     public override async Task ManualRequest(Empty req, IServerStreamWriter<SubmissionInformation> res, ServerCallContext context){
         Console.WriteLine("-----手動実行クライアント接続完了-----");
-        await _con.ConnectServer(req, res);
+        _con.ConnectServer(req, res);
         while(true){await Task.Delay(10000);}
     }
     public override async Task ManualExecStream(IAsyncStreamReader<ExecutionOutput> req, IServerStreamWriter<ExecutionInput> res, ServerCallContext context){

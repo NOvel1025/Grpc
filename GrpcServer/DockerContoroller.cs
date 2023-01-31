@@ -22,13 +22,13 @@ namespace GrpcServer
         //手動実行用コンテナのリスト
         private static List<ManualExecuteContainer> _manualExecContainerList = new List<ManualExecuteContainer>();
         //自動実行用コンテナリストに追加
-        public async Task ConnectServer(IAsyncStreamReader<ExecutionResult> req, IServerStreamWriter<SubmissionInformation> res)
+        public void ConnectServer(IAsyncStreamReader<ExecutionResult> req, IServerStreamWriter<SubmissionInformation> res)
         {
             AutoExecuteContainer autoExecuteContainer = new AutoExecuteContainer(req, res, true);
             _autoExecContainerList.Add(autoExecuteContainer);
         }
         //手動実行用のサーバーストリーミングの待ちクライアントリストに追加
-        public async Task ConnectServer(Empty req, IServerStreamWriter<SubmissionInformation> res)
+        public void ConnectServer(Empty req, IServerStreamWriter<SubmissionInformation> res)
         {
             ManualExecuteRequestClient manualExecuteRequestClient = new ManualExecuteRequestClient(res, true, true);
             _manualClientList.Add(manualExecuteRequestClient);
@@ -38,7 +38,9 @@ namespace GrpcServer
         {
             ManualExecuteContainer manualExecContainer = new ManualExecuteContainer(req, res, false);
             _manualExecContainerList.Add(manualExecContainer);
+            #pragma warning disable CS8604 // 警告がうざいから消す
             await _manualExecContainerList[_manualExecContainerList.IndexOf(manualExecContainer)].Req.MoveNext();
+            #pragma warning disable CS8602 // 警告がうざいから消す
             var manualExecContainerCurrent = _manualExecContainerList[_manualExecContainerList.IndexOf(manualExecContainer)].Req.Current;
             _manualExecContainerList[_manualExecContainerList.IndexOf(manualExecContainer)].ExecutionOutputStr = manualExecContainerCurrent.ExecutionOutputStr;
             while (!_manualExecContainerList[_manualExecContainerList.IndexOf(manualExecContainer)].IsEnd) { await Task.Delay(1); }
@@ -66,19 +68,22 @@ namespace GrpcServer
                 {
                     cClient.Available = false;
                     Console.WriteLine(execFile.ToString());
-                    await cClient.Res.WriteAsync(execFile);
-                    if (await cClient.Req.MoveNext())
+                    if (cClient.Res != null)
                     {
-                        var cClientRequestCurrent = cClient.Req.Current;
-                        string submissionFileResult = cClientRequestCurrent.SubmissionFile.ToString();
-                        string answerFileResult = cClientRequestCurrent.AnswerFile.ToString();
-                        int correction = cClientRequestCurrent.Correction;
-                        ExecutionResult ans =
-                            new ExecutionResult { SubmissionFile = submissionFileResult, AnswerFile = answerFileResult, Correction = correction };
-                        cClient.Available = true;
-
-                        return ans;
+                        await cClient.Res.WriteAsync(execFile);
+                        if (cClient.Req != null)
+                        {
+                            await cClient.Req.MoveNext();
+                            var cClientRequestCurrent = cClient.Req.Current;
+                            string submissionFileResult = cClientRequestCurrent.SubmissionFile.ToString();
+                            string answerFileResult = cClientRequestCurrent.AnswerFile.ToString();
+                            int correction = cClientRequestCurrent.Correction;
+                            ExecutionResult ans =
+                                new ExecutionResult { SubmissionFile = submissionFileResult, AnswerFile = answerFileResult, Correction = correction };
+                            return ans;
+                        }
                     }
+                    cClient.Available = true;
                 }
             }
             return new ExecutionResult { SubmissionFile = "error", AnswerFile = "error", Correction = 2 };
@@ -96,28 +101,47 @@ namespace GrpcServer
                     manualExecuteRequestClient.Available = false;
                     try
                     {
+                        if (manualEx2Client.Req == null)
+                        {
+                            throw new NullReferenceException();
+                        }
                         await manualEx2Client.Req.MoveNext();
                         var manualEClientReqCurrent = manualEx2Client.Req.Current;
                         string hash = manualEClientReqCurrent.InputStr;
-                        await manualExecuteRequestClient.Res.WriteAsync( manualEClientReqCurrent );
-                        while (_manualExecContainerList.Count == 0) { await Task.Delay(10); }
-                        manualContainer = await ReturnManualExecContainer(hash);
-                        var task = Task.Run(async () =>
+                        if (manualExecuteRequestClient.Res != null)
                         {
-                            while (await manualContainer.Req.MoveNext())
+                            await manualExecuteRequestClient.Res.WriteAsync(manualEClientReqCurrent);
+                            while (_manualExecContainerList.Count == 0) { await Task.Delay(10); }
+                            manualContainer = await ReturnManualExecContainer(hash);
+                            var task = Task.Run(async () =>
                             {
-                                var value = manualContainer.Req.Current;
-                                Console.Write(value.ExecutionOutputStr);
-                                manualEx2Client.Res.WriteAsync(new ExecutionOutput { ExecutionOutputStr = value.ExecutionOutputStr.ToString() });
+                                if (manualContainer.Req == null)
+                                {
+                                    throw new NullReferenceException();
+                                }
+                                while (await manualContainer.Req.MoveNext())
+                                {
+                                    var value = manualContainer.Req.Current;
+                                    Console.Write(value.ExecutionOutputStr);
+                                    if (manualEx2Client.Res == null)
+                                    {
+                                        continue;
+                                    }
+                                    await manualEx2Client.Res.WriteAsync(new ExecutionOutput { ExecutionOutputStr = value.ExecutionOutputStr.ToString() ?? "" });
+                                }
+                            });
+                            while (await manualEx2Client.Req.MoveNext())
+                            {
+                                manualEClientReqCurrent = manualEx2Client.Req.Current;
+                                string executionInputStr = manualEClientReqCurrent.InputStr;
+                                if (manualContainer.Res == null)
+                                {
+                                    continue;
+                                }
+                                await manualContainer.Res.WriteAsync(new ExecutionInput { ExecutionInputStr = executionInputStr });
                             }
-                        });
-                        while (await manualEx2Client.Req.MoveNext())
-                        {
-                            manualEClientReqCurrent = manualEx2Client.Req.Current;
-                            string executionInputStr = manualEClientReqCurrent.InputStr;
-                            await manualContainer.Res.WriteAsync(new ExecutionInput { ExecutionInputStr = executionInputStr });
+                            await task;
                         }
-                        await task;
                     }
                     catch (Exception ex)
                     {
