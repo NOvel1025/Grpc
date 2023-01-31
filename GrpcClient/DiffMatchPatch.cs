@@ -15,6 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#pragma warning disable CS8765 // Rethrow to preserve stack details
+#pragma warning disable CS8600 // Rethrow to preserve stack details
+#pragma warning disable CS8603 // Rethrow to preserve stack details
+#pragma warning disable CS8602 // Rethrow to preserve stack details
 
 using System;
 using System.Collections.Generic;

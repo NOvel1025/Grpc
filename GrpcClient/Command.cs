@@ -12,7 +12,7 @@ namespace GrpcClient
 {
     public class Command
     {
-        
+
         /// <summary>
         /// コンテナ名、コンテナを生成するときにautoかmanualに言語、番号をつけて生成
         /// </summary>
@@ -22,24 +22,52 @@ namespace GrpcClient
         /// </summary>
         private string _lang = "";
         /// <summary>
-        /// 自動実行用か手動実行用
+        /// 自動実行用か手動実行用かのフラグ
         /// </summary>
         private bool _isAuto = false;
+        /// <summary>
+        /// 入力文字列
+        /// </summary>
         private string _inputStr = "";
+        /// <summary>
+        /// 基本ディレクトリのパス
+        /// </summary>
         private string _path = "/opt/data";
+        /// <summary>
+        /// Ex2のダウンロードコントローラのAPI
+        /// </summary>
         private string _ex2PlusUrl = "http://10.40.112.110:5556/api/GrpcDownload/";
+        /// <summary>
+        /// Ex2のダウンロードAPIのキー
+        /// </summary>
         private string _apiKey = "?apiKey=grpcdesu";
-        private Func<string, Task> _requestWriteAsync;
-        private Action<StreamWriter> _setStreamWriter;
+        /// <summary>
+        /// 手動実行用のリクエストストリームへの送信のデリゲート
+        /// </summary>
+        private Func<string, Task>? _requestWriteAsync;
+        /// <summary>
+        /// ストリームライターに手動実行のプロセスのinputをセットするデリゲート
+        /// </summary>
+        private Action<StreamWriter>? _setStreamWriter;
+        /// <summary>
+        /// コンパイルしない言語の列
+        /// </summary>
+        /// <value></value>
         private string[] _notCompileLanguage = new string[]{
             "php", "python3"
         };
-        public Command() { }
         public Command(string containerName, string lang)
         {
             this._containerName = containerName;
             this._lang = lang;
         }
+        /// <summary>
+        /// コマンドクラスのコンストラクタ
+        /// </summary>
+        /// <param name="containerName">コンテナの名前</param>
+        /// <param name="lang">言語</param>
+        /// <param name="isAuto">自動実行フラグ</param>
+        /// <param name="inputStr">入力文字列</param>
         public Command(string containerName, string lang, bool isAuto, string inputStr)
         {
             this._containerName = containerName;
@@ -47,6 +75,13 @@ namespace GrpcClient
             this._isAuto = isAuto;
             this._inputStr = inputStr;
         }
+        /// <summary>
+        /// コマンドクラスのコンストラクタ
+        /// </summary>
+        /// <param name="containerName">コンテナの名前</param>
+        /// <param name="lang">言語</param>
+        /// <param name="requestWriteAsync">リクエストストリームの送信用デリゲート</param>
+        /// <param name="setStreamWriter">プロセスの入力ストリームをセットするデリゲート</param>
         public Command(string containerName, string lang, Func<string, Task> requestWriteAsync, Action<StreamWriter> setStreamWriter)
         {
             this._requestWriteAsync = requestWriteAsync;
@@ -54,6 +89,11 @@ namespace GrpcClient
             this._containerName = containerName;
             this._lang = lang;
         }
+        /// <summary>
+        /// 自動実行用プロセス
+        /// </summary>
+        /// <param name="fileInformations">ファイル情報の列</param>
+        /// <returns>自動実行プロセスの実行結果</returns>
         public async Task<StandardCmd> AutoExecAsync(FileInformation[] fileInformations)
         {
             StandardCmd result = new();
@@ -117,6 +157,11 @@ namespace GrpcClient
 
             return result;
         }
+        /// <summary>
+        /// 手動実行プロセス
+        /// </summary>
+        /// <param name="fileInformations">ファイル情報の列</param>
+        /// <returns>手動実行の実行結果</returns>
         public async Task<StandardCmd> ManualExecAsync(FileInformation[] fileInformations)
         {
 
@@ -182,6 +227,11 @@ namespace GrpcClient
             }
             return result;
         }
+        /// <summary>
+        /// コンテナに必要なフォルダを作ってコンテナを立てる
+        /// コンテナを立てる処理はバッシュファイルに記述(./bashfile/container.sh)
+        /// </summary>
+        /// <returns>実行結果</returns>
         public async Task<StandardCmd> BuildExecuteEnvironmentAsync()
         {
             StandardCmd mkdirResult = await MkdirExecuteFoldersAsync();
@@ -201,6 +251,10 @@ namespace GrpcClient
             }
             return buildResult;
         }
+        /// <summary>
+        /// コンテナ関連のフォルダを削除してコンテナを閉じる
+        /// </summary>
+        /// <returns>実行結果</returns>
         public async Task DiscardContainerAsync()
         {
             StandardCmd rmContainerFiles = await RmContainerFilesAsync();
@@ -276,7 +330,7 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> UnzipAsync(string filePath)
         {
-            string unzipPath = Path.GetDirectoryName(filePath);
+            string unzipPath = Path.GetDirectoryName(filePath) ?? "";
             string unzip = "-c \"unzip -d " + unzipPath + " " + filePath + "\"";
             StandardCmd unzipResult = await ExecuteAsync(unzip);
             if (unzipResult.ExitCode != 0)
@@ -299,7 +353,7 @@ namespace GrpcClient
         public async Task<StandardCmd> CompileJavaAsync(string fileName)
         {
             string downloadPath = "./executeFiles/" + _containerName + "/data/" + fileName;
-            string encode = await judgeEncodeAsync(downloadPath);
+            string encode = judgeEncode(downloadPath);
             string className = Path.GetFileNameWithoutExtension(fileName);
             if (encode.ToLower().Contains("utf-8"))
             {
@@ -323,7 +377,7 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> CompileClangAsync(string directoryPath, string mainFile)
         {
-            string encode = await judgeEncodeAsync(directoryPath + "/" + mainFile);
+            string encode = judgeEncode(directoryPath + "/" + mainFile);
             if (encode.ToLower().Contains("utf-8"))
             {
                 string compile = "-c \"docker exec -w /opt/bin " + _containerName + " bash compile.sh ";
@@ -353,9 +407,13 @@ namespace GrpcClient
             string cmdStr = "-c \"docker exec -i -w /opt/bin" + mainFilePath + " " + _containerName + " bash -c 'bash execute.sh " + className + "'\"";
             return await ExecuteAsync(cmdStr);
         }
+        /// <summary>
+        /// コマンドの文字列を受け取り実行するプロセス
+        /// </summary>
+        /// <param name="cmdStr">コマンドの文字列</param>
+        /// <returns>実行結果</returns>
         private async Task<StandardCmd> ExecuteAsync(string cmdStr)
         {
-            bool isTimeOut = true;
             Process? process = new();
             var task = Task.Run(async () =>
             {
@@ -407,33 +465,25 @@ namespace GrpcClient
             StreamWriter sw = process.StandardInput;
             StreamReader sr = process.StandardOutput;
             string str = "";
-            try
+            #pragma warning disable CS8602 //コンストラクタでセットしてるから大丈夫
+            _setStreamWriter(sw);
+            bool isTimeOut = true;
+
+            var task = Task.Run(async () =>
             {
-                _setStreamWriter(sw);
-                int ch;
-                bool isTimeOut = true;
+                str = await PrintOutAsync(process);
+                isTimeOut = false;
 
-                var task = Task.Run(async () =>
-                {
-                    str = await PrintOutAsync(process);
-                    isTimeOut = false;
-
-                });
-                int i = 0;
-                while (i++ < 6000 && isTimeOut)
-                {
-                    await Task.Delay(10);
-                }
-                if (6000 <= i)
-                {
-                    process.Kill();
-                    return "this is time out";
-                }
+            });
+            int i = 0;
+            while (i++ < 6000 && isTimeOut)
+            {
+                await Task.Delay(10);
             }
-            finally
+            if (6000 <= i)
             {
-                // sr.Close();
-                // sw.Close();
+                process.Kill();
+                return "this is time out";
             }
 
             return str;
@@ -442,12 +492,11 @@ namespace GrpcClient
         {
             string str = "";
             string[] strIn = _inputStr.Split("\n");
-            string strOut = "";
             int ch = -1;
             int i = 0;
             bool isTimeOut = true;
 
-            var task = Task.Run(async () =>
+            var task = Task.Run(() =>
             {
                 StreamWriter sw = process.StandardInput;
                 StreamReader sr = process.StandardOutput;
@@ -551,7 +600,7 @@ namespace GrpcClient
         }
         private async Task<string> PrintOutAsync(Process process)
         {
-            int ch;
+            int ch = 0;
             string str = "";
             StreamReader sr = process.StandardOutput;
             try
@@ -561,7 +610,8 @@ namespace GrpcClient
                     str = str + (char)ch;
                     // Console.Write((char)ch);
                     await Task.Delay(1);
-                    _requestWriteAsync(((char)ch).ToString());
+                    #pragma warning disable CS8602 //コンストラクタでセットするから大丈夫
+                    await _requestWriteAsync(((char)ch).ToString());
                 }
             }
             finally
@@ -587,11 +637,11 @@ namespace GrpcClient
             using var outStream = File.Create(downloadPath);
             stream.CopyTo(outStream);
         }
-        private async Task<string> judgeEncodeAsync(string downloadPath)
+        private string judgeEncode(string filePath)
         {
             try
             {
-                FileInfo file = new FileInfo(downloadPath);
+                FileInfo file = new FileInfo(filePath);
                 string name = "";
                 // ファイル自動判別読み出しクラスを生成
                 using (Hnx8.ReadJEnc.FileReader reader = new FileReader(file))
@@ -610,7 +660,7 @@ namespace GrpcClient
                 }
                 return name;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return "not Found File";
             }
