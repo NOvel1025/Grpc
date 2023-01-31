@@ -37,11 +37,12 @@ namespace GrpcClient
         /// <summary>
         /// Ex2のダウンロードコントローラのAPI
         /// </summary>
-        private string _ex2PlusUrl = "http://10.40.112.110:5556/api/GrpcDownload/";
+        private string _ex2PlusUrl = "http://126.114.253.21:5556/api/GrpcDownload/";
         /// <summary>
         /// Ex2のダウンロードAPIのキー
         /// </summary>
         private string _apiKey = "?apiKey=grpcdesu";
+        private string _generateDirectoryPath = "";
         /// <summary>
         /// 手動実行用のリクエストストリームへの送信のデリゲート
         /// </summary>
@@ -143,12 +144,16 @@ namespace GrpcClient
                     }
                     if (result.ExitCode == 0 && mainFile != "")
                     {
-                        result = await ExecuteFileAsync(mainFile);
+                        if (mainFile != "")
+                        {
+                            result = await ExecuteFileAsync(mainFile);
+                        }
+                        else
+                        {
+                            result = new StandardCmd("File not found.", "File not found.", -1);
+                        }
                     }
-                    else
-                    {
-                        result = new StandardCmd("File not found.", "File not found.", -1);
-                    }
+
                     break;
                 }
                 await DiscardContainerAsync();
@@ -388,10 +393,12 @@ namespace GrpcClient
                     string filesString = "";
                     filesString = "\n" + result.Output.Replace("\n", "  ");
                     filesString += "\n[" + (await CurrentDirectoryContainerAsync()).Output.Trim() + "]# ";
-                    if(command.Length == 1){
+                    if (command.Length == 1)
+                    {
                         filesString += str;
                     }
-                    else{
+                    else
+                    {
                         filesString += command[0] + " " + str;
                     }
                     return filesString;
@@ -400,13 +407,25 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> CompileJavaAsync(string directoryPath, string fileName)
         {
-            string downloadPath = "./executeFiles/" + _containerName + "/data/" + fileName;
-            string encode = judgeEncode(downloadPath);
+            string filePath = "";
+            string generateDirectoryPath = "";
+            string insideContainerFilePath = "";
+            if ((generateDirectoryPath = await ReplaceJavaPackageAsync(directoryPath)) == "")
+            {
+                filePath = directoryPath + "/" + fileName;
+                insideContainerFilePath = "/opt/data" + "/" + fileName;
+            }
+            else
+            {
+                filePath = directoryPath + "/" + generateDirectoryPath;
+                insideContainerFilePath = "/opt/data/" + generateDirectoryPath;
+                _generateDirectoryPath = generateDirectoryPath;
+            }
+            string encode = judgeEncode(filePath);
             string className = Path.GetFileNameWithoutExtension(fileName);
-            ReplaceJavaPackage(directoryPath);
             if (encode.ToLower().Contains("utf-8"))
             {
-                string compile = "-c \"docker exec -w /opt/bin " + _containerName + " bash compile.sh " + className + "\"";
+                string compile = "-c \"docker exec -w " + Path.GetDirectoryName(insideContainerFilePath) + " " + _containerName + " bash -c 'javac -encoding UTF-8 " + fileName + "'\"";
                 StandardCmd compileResult = await ExecuteAsync(compile);
                 if (compileResult.ExitCode == 0)
                 {
@@ -415,14 +434,14 @@ namespace GrpcClient
             }
             if (encode.ToLower().Contains("sjis"))
             {
-                string compileSjis = "-c \"docker exec -w /opt/bin " + _containerName + " bash compile_sjis.sh " + className + "\"";
+                string compileSjis = "-c \"docker exec -w " + Path.GetDirectoryName(insideContainerFilePath) + " " + _containerName + " bash -c 'javac -encoding Shift_JIS " + fileName + "'\"";
                 StandardCmd compileSjisResult = await ExecuteAsync(compileSjis);
                 if (compileSjisResult.ExitCode == 0)
                 {
                     return compileSjisResult;
                 }
             }
-            return new StandardCmd("compile error", "compile error", -1);
+            return new StandardCmd("compile error encoding " + encode, "compile errorencoding " + encode, -1);
         }
         public async Task<StandardCmd> CompileClangAsync(string directoryPath, string mainFile)
         {
@@ -451,9 +470,22 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> ExecuteFileAsync(string fileName)
         {
-            string mainFilePath = Path.GetDirectoryName(fileName) == "" ? "" : "/" + Path.GetDirectoryName(fileName);
-            string className = Path.GetFileNameWithoutExtension(fileName);
-            string cmdStr = "-c \"docker exec -i -w /opt/bin" + mainFilePath + " " + _containerName + " bash -c 'bash execute.sh " + className + "'\"";
+            string cmdStr = "";
+            if (_generateDirectoryPath == "")
+            {
+                string mainFilePath = Path.GetDirectoryName(fileName) == "" ? "" : "/" + Path.GetDirectoryName(fileName);
+                string className = Path.GetFileNameWithoutExtension(fileName);
+                cmdStr = "-c \"docker exec -i -w /opt/bin " + _containerName + " bash -c 'bash execute.sh " + className + "'\"";
+            }
+            else
+            {
+                //Package記述のあるJavaファイルに対応する
+                string mainFilePath = Path.GetDirectoryName(fileName) == "" ? "" : "/" + Path.GetDirectoryName(fileName);
+                string className = Path.GetFileNameWithoutExtension(fileName);
+                string[] executeDirectoryPath = _generateDirectoryPath.Split("/");
+                cmdStr = "-c \"docker exec -i -w /opt/data " + _containerName + " bash -c 'bash /opt/bin/execute.sh " + Path.GetDirectoryName(_generateDirectoryPath) + "/" + className + "'\"";
+            }
+
             return await ExecuteAsync(cmdStr);
         }
         /// <summary>
@@ -860,29 +892,44 @@ namespace GrpcClient
             string rm = "-c \"rm -fR " + Path.GetDirectoryName(filePath);
             await ExecuteAsync(rm);
         }
-        private void ReplaceJavaPackage(string directoryPath)
+        private async Task<string> ReplaceJavaPackageAsync(string directoryPath)
         {
+            string mainFilePath = "";
             try
             {
-
                 List<string> filePaths = GetFilePaths(directoryPath);
-                Regex reg = new Regex(@"package [a-zA-Z0-9\.]*;");
+                Regex search = new Regex(@"package ([a-zA-Z0-9\.]*);");
+                Regex replaceDottoSlash = new Regex(@"\.");
+
                 foreach (string filePath in filePaths)
                 {
                     using (StreamReader sr = new StreamReader(filePath))
                     {
+                        string fileGenerationPath = "";
+                        string mvFile = "";
+
                         string fileText = sr.ReadToEnd();
-                        string replaceText = reg.Replace(fileText, "");
-                        using (StreamWriter sw = new StreamWriter(filePath, false))
+                        if (fileText.ToLower().Contains("package"))
                         {
-                            sw.Write(replaceText);
+                            fileGenerationPath = (search.Match(fileText)).Value.ToString();
+                            fileGenerationPath = search.Replace(fileGenerationPath, "$1");
+                            fileGenerationPath = replaceDottoSlash.Replace(fileGenerationPath, "/");
+                            string mkdir = "-c \"mkdir -p " + directoryPath + "/" + fileGenerationPath + "\"";
+                            await ExecuteAsync(mkdir);
+                            mvFile = "-c \"mv " + filePath + " " + directoryPath + "/" + fileGenerationPath + "/\"";
+                            await ExecuteAsync(mvFile);
+                            if (JudgeMainFile(directoryPath + "/" + fileGenerationPath + "/" + Path.GetFileName(filePath)))
+                            {
+                                mainFilePath = fileGenerationPath + "/" + Path.GetFileName(filePath);
+                            }
                         }
                     }
                 }
+                return mainFilePath;
             }
             catch (Exception)
             {
-                return;
+                return mainFilePath;
             }
         }
     }
