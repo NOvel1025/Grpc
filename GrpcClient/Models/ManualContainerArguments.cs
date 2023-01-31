@@ -16,6 +16,53 @@ namespace GrpcClient.Models
             AvailableLanguages = new string[]{
                 "java11", "java17", "clang", "php", "python3"
             };
+            if (AvailableLanguages.Any(a => a == Lang))
+            {
+                IsAvailableLanguage = true;
+            }
+            else
+            {
+                IsAvailableLanguage = false;
+            }
+            IsZip = false;
+            IsAvailableExtension = false;
+            foreach (FileInformation fileInformation in SubmissionFiles)
+            {
+                string fileName = fileInformation.FileName;
+                if(!IsAvailableExtension || !IsZip){
+                    switch(Lang){
+                        case "java11":
+                            if(fileName.ToLower().Contains(".java")){
+                                IsAvailableExtension = true;
+                            }
+                            break;
+                        case "clang":
+                            if(fileName.ToLower().Contains(".c")){
+                                IsAvailableExtension = true;
+                            }
+                            break;
+                        case "php":
+                            if(fileName.ToLower().Contains(".php")){
+                                IsAvailableExtension = true;
+                            }
+                            break;
+                        case "python3":
+                            if(fileName.ToLower().Contains(".py")){
+                                IsAvailableExtension = true;
+                            }
+                            break;
+                        default:
+                            if(fileName.ToLower().Contains(".zip")){
+                                IsZip = true;
+                            }
+                            break;
+                    }
+                    if(fileName.ToLower().Contains(".zip")){
+                        IsZip = true;
+                        continue;
+                    }
+                }
+            }
             IsSend = false;
             IsDoProcess = false;
             IsEndConnect = false;
@@ -26,7 +73,7 @@ namespace GrpcClient.Models
                 str = str ?? "";
                 if (IsSend)
                 {
-                    #pragma warning disable CS8602 //初期化ができない
+#pragma warning disable CS8602 //初期化ができない
                     await ManualExecStream.RequestStream.WriteAsync(new ExecutionOutput { ExecutionOutputStr = str });
                 }
             });
@@ -41,6 +88,9 @@ namespace GrpcClient.Models
         public int SubmissionFileCount { get; set; }
         public string ContainerName { get; set; }
         public string[] AvailableLanguages { get; set; }
+        public bool IsAvailableLanguage { get; set; }
+        public bool IsAvailableExtension { get; set; }
+        public bool IsZip { get; set; }
         public bool IsSend { get; set; }
         public bool IsDoProcess { get; set; }
         public bool IsEndConnect { get; set; }
@@ -57,7 +107,8 @@ namespace GrpcClient.Models
             {
                 return "sjisでコンパイルする場合はjavacs、UTF-8でコンパイルする場合はjavacuと入力してください\n";
             }
-            if(_warningLang[1] == Lang){
+            if (_warningLang[1] == Lang)
+            {
                 return "sjisでコンパイルする場合はgccs、UTF-8でコンパイルする場合はgccuと入力してください\n";
             }
             return "";

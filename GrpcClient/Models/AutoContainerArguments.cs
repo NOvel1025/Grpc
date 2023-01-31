@@ -17,18 +17,51 @@ namespace GrpcClient.Models
             AvailableLanguages = new string[]{
                 "java11", "java17", "clang", "php", "python3"
             };
+            if (AvailableLanguages.Any(a => a == Lang))
+            {
+                IsAvailableLanguage = true;
+            }
+            else
+            {
+                IsAvailableLanguage = false;
+            }
+            
             Correction = 0;
             CorrectionBool = false;
+            IsZip = false;
+            IsAvailableExtension = false;
             foreach (FileInformation fileInformation in SubmissionFiles)
             {
-                if (fileInformation.FileName.ToLower().Contains("zip"))
-                {
-                    IsZip = true;
-                    break;
-                }
-                else
-                {
-                    IsZip = false;
+                string fileName = fileInformation.FileName;
+                if(!IsAvailableExtension || !IsZip){
+                    switch(Lang){
+                        case "java11":
+                            if(fileName.ToLower().Contains(".java")){
+                                IsAvailableExtension = true;
+                            }
+                            break;
+                        case "clang":
+                            if(fileName.ToLower().Contains(".c")){
+                                IsAvailableExtension = true;
+                            }
+                            break;
+                        case "php":
+                            if(fileName.ToLower().Contains(".php")){
+                                IsAvailableExtension = true;
+                            }
+                            break;
+                        case "python3":
+                            if(fileName.ToLower().Contains(".py")){
+                                IsAvailableExtension = true;
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                    if(fileName.ToLower().Contains(".zip")){
+                        IsZip = true;
+                        continue;
+                    }
                 }
             }
         }
@@ -43,6 +76,8 @@ namespace GrpcClient.Models
         public string SubmissionFileResult { get; set; }
         public string AnswerFileResult { get; set; }
         public string[] AvailableLanguages { get; set; }
+        public bool IsAvailableLanguage { get; set; }
+        public bool IsAvailableExtension { get; set; }
         public int Correction { get; set; }
         public bool CorrectionBool { get; set; }
         public bool IsZip { get; set; }

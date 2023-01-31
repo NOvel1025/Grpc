@@ -7,6 +7,7 @@ using System.IO;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Hnx8.ReadJEnc;
+using System.Text.RegularExpressions;
 
 namespace GrpcClient
 {
@@ -136,7 +137,7 @@ namespace GrpcClient
                             }
                             if (_lang == "java11")
                             {
-                                result = await CompileJavaAsync(mainFile);
+                                result = await CompileJavaAsync(directoryPath, mainFile);
                             }
                         }
                     }
@@ -162,12 +163,11 @@ namespace GrpcClient
         /// </summary>
         /// <param name="fileInformations">ファイル情報の列</param>
         /// <returns>手動実行の実行結果</returns>
-        public async Task<StandardCmd> ManualExecAsync(FileInformation[] fileInformations)
+        public async Task<StandardCmd> ManualExecAsync(FileInformation[] fileInformations, bool isAvailableExtension, bool isZip)
         {
 
             StandardCmd result = new();
             string mainFile = "";
-            bool isZip = false;
             string directoryPath = "./executeFiles/" + _containerName + "/data";
             if ((result = await BuildExecuteEnvironmentAsync()).ExitCode == 0)
             {
@@ -175,9 +175,8 @@ namespace GrpcClient
                 {
                     string filePath = directoryPath + "/" + fileInformation.FileName;
                     await DownloadFileAsync(_ex2PlusUrl + fileInformation.FileId + _apiKey, filePath);
-                    if (fileInformation.FileName.ToLower().Contains("zip"))
+                    if (isZip)
                     {
-                        isZip = true;
                         if ((result = await UnzipAsync(filePath)).ExitCode == 0)
                         {
                             mainFile = Path.GetFileName(await JudgeUnzipMainFileAsync(directoryPath));
@@ -199,7 +198,7 @@ namespace GrpcClient
                 {
                     if ((mainFile = JudgeMainFile(fileInformations)) == "")
                     {
-                        return new StandardCmd("File not found.", "File not found.", -1);
+                        return new StandardCmd("Main File not found.", "Main File not found.", 0);
                     }
                 }
                 else
@@ -215,12 +214,12 @@ namespace GrpcClient
                             }
                             if (_lang == "java11")
                             {
-                                result = await CompileJavaAsync(mainFile);
+                                result = await CompileJavaAsync(directoryPath, mainFile);
                             }
                         }
                         else
                         {
-                            return new StandardCmd("File not found.", "File not found.", -1);
+                            return new StandardCmd("Main File not found.", "Main File not found.", 0);
                         }
                     }
                 }
@@ -330,31 +329,81 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> UnzipAsync(string filePath)
         {
-            string unzipPath = Path.GetDirectoryName(filePath) ?? "";
-            string unzip = "-c \"unzip -d " + unzipPath + " " + filePath + "\"";
-            StandardCmd unzipResult = await ExecuteAsync(unzip);
-            if (unzipResult.ExitCode != 0)
+            try
             {
-                return unzipResult;
-            }
-            string rmzip = "-c \"rm -fR " + filePath + "\"";
-            StandardCmd rmzipResult = await ExecuteAsync(rmzip);
-            if (rmzipResult.ExitCode != 0)
-            {
+                string unzipPath = Path.GetDirectoryName(filePath) ?? "";
+                string unzip = "-c \"unzip -d " + unzipPath + " " + filePath + "\"";
+                StandardCmd unzipResult = await ExecuteAsync(unzip);
+                if (unzipResult.ExitCode != 0)
+                {
+                    return unzipResult;
+                }
+                string rmzip = "-c \"rm -fR " + filePath + "\"";
+                StandardCmd rmzipResult = await ExecuteAsync(rmzip);
+                if (rmzipResult.ExitCode != 0)
+                {
+                    return rmzipResult;
+                }
                 return rmzipResult;
             }
-            return rmzipResult;
+            catch (Exception)
+            {
+                return new StandardCmd("can't open zip file.", "can't open zip file.", -1);
+            }
         }
         public async Task<StandardCmd> RmAsync(string fileName)
         {
             string cmdStr = "-c \"docker exec -i -w /opt/data " + _containerName + " bash -c 'rm -Rf " + fileName + "\"";
             return await ExecuteAsync(cmdStr);
         }
-        public async Task<StandardCmd> CompileJavaAsync(string fileName)
+        public async Task<string> PressTabAsync(string str)
+        {
+            Regex reg = new Regex("-tab");
+            str = reg.Replace(str, "", 1);
+            string[] command = str.Split(" ");
+            foreach (string s in command)
+            {
+                str = s.Trim();
+            }
+            string filenamePrediction = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c 'ls -d " + str + "'*\"";
+            StandardCmd result = await ExecuteAsync(filenamePrediction);
+            if (result.ExitCode != 0)
+            {
+                return "not found";
+            }
+            else
+            {
+                string[] files = result.Output.Split("\n");
+                //ファイルが1つでも2が帰ってくるから2
+                if (files.Length == 2)
+                {
+                    Regex reg2 = new Regex(str);
+                    str = reg2.Replace(files[0], "", 1);
+                    return str;
+                }
+                else
+                {
+                    Comparison comparison = new Comparison();
+                    str = comparison.FirstMatchString(files);
+                    string filesString = "";
+                    filesString = "\n" + result.Output.Replace("\n", "  ");
+                    filesString += "\n[" + (await CurrentDirectoryContainerAsync()).Output.Trim() + "]# ";
+                    if(command.Length == 1){
+                        filesString += str;
+                    }
+                    else{
+                        filesString += command[0] + " " + str;
+                    }
+                    return filesString;
+                }
+            }
+        }
+        public async Task<StandardCmd> CompileJavaAsync(string directoryPath, string fileName)
         {
             string downloadPath = "./executeFiles/" + _containerName + "/data/" + fileName;
             string encode = judgeEncode(downloadPath);
             string className = Path.GetFileNameWithoutExtension(fileName);
+            ReplaceJavaPackage(directoryPath);
             if (encode.ToLower().Contains("utf-8"))
             {
                 string compile = "-c \"docker exec -w /opt/bin " + _containerName + " bash compile.sh " + className + "\"";
@@ -465,7 +514,7 @@ namespace GrpcClient
             StreamWriter sw = process.StandardInput;
             StreamReader sr = process.StandardOutput;
             string str = "";
-            #pragma warning disable CS8602 //コンストラクタでセットしてるから大丈夫
+#pragma warning disable CS8602 //コンストラクタでセットしてるから大丈夫
             _setStreamWriter(sw);
             bool isTimeOut = true;
 
@@ -610,7 +659,7 @@ namespace GrpcClient
                     str = str + (char)ch;
                     // Console.Write((char)ch);
                     await Task.Delay(1);
-                    #pragma warning disable CS8602 //コンストラクタでセットするから大丈夫
+#pragma warning disable CS8602 //コンストラクタでセットするから大丈夫
                     await _requestWriteAsync(((char)ch).ToString());
                 }
             }
@@ -667,29 +716,37 @@ namespace GrpcClient
         }
         private bool JudgeMainFile(string filePath)
         {
-            using (StreamReader sr = new StreamReader(filePath))
+            try
             {
-                if (_lang == "java11")
+                using (StreamReader sr = new StreamReader(filePath))
                 {
-                    if (sr.ReadToEnd().ToLower().Contains("void main"))
+                    string fileText = sr.ReadToEnd();
+                    if (_lang == "java11")
                     {
-                        return true;
+                        if (fileText.ToLower().Contains("void main"))
+                        {
+                            return true;
+                        }
+                    }
+                    if (_lang == "clang")
+                    {
+                        if (fileText.ToLower().Contains("main("))
+                        {
+                            return true;
+                        }
+                    }
+                    if (_lang == "python3")
+                    {
+                        if (fileText.ToLower().Contains("if __name__ == '__main__'"))
+                        {
+                            return true;
+                        }
                     }
                 }
-                if (_lang == "clang")
-                {
-                    if (sr.ReadToEnd().ToLower().Contains("main("))
-                    {
-                        return true;
-                    }
-                }
-                if (_lang == "python3")
-                {
-                    if (sr.ReadToEnd().ToLower().Contains("if __name__ == '__main__'"))
-                    {
-                        return true;
-                    }
-                }
+            }
+            catch (System.IO.FileNotFoundException)
+            {
+                return false;
             }
             return false;
         }
@@ -724,17 +781,19 @@ namespace GrpcClient
             }
             if (mainFile != "" && Path.GetFileName(Path.GetDirectoryName(mainFile)) != "data")
             {
-                string mv = "-c \"mv " + Path.GetDirectoryName(mainFile) + "/* " + directoryPath;
-                await ExecuteAsync(mv);
-                string rm = "-c \"rm -fR " + Path.GetDirectoryName(mainFile);
-                await ExecuteAsync(rm);
+                await moveFileDirectoryAsync(mainFile, directoryPath);
+            }
+            else if (mainFile == "")
+            {
+                string firstFilePath = GetFirstFilePath(directoryPath);
+                await moveFileDirectoryAsync(firstFilePath, directoryPath);
             }
 
             return mainFile;
         }
-        private string GenerateCompileString(string downloadPath, string mainFile, string compile)
+        private string GenerateCompileString(string diretoryPath, string mainFile, string compile)
         {
-            List<string> filesPath = GetFilePaths(downloadPath);
+            List<string> filesPath = GetFilePaths(diretoryPath);
             foreach (string filePath in filesPath)
             {
                 if (Path.GetFileName(filePath) == mainFile)
@@ -762,15 +821,15 @@ namespace GrpcClient
             compile += "\"";
             return compile;
         }
-        private List<string> GetFilePaths(string path)
+        private List<string> GetFilePaths(string directoryPath)
         {
             List<string> filePaths = new List<string>();
-            string[] files = Directory.GetFiles(path);
+            string[] files = Directory.GetFiles(directoryPath);
             foreach (string file in files)
             {
                 filePaths.Add(file);
             }
-            string[] directories = Directory.GetDirectories(path);
+            string[] directories = Directory.GetDirectories(directoryPath);
             foreach (string directory in directories)
             {
                 foreach (string file in GetFilePaths(directory))
@@ -779,6 +838,52 @@ namespace GrpcClient
                 }
             }
             return filePaths;
+        }
+        private string GetFirstFilePath(string directoryPath)
+        {
+            string[] files = Directory.GetFiles(directoryPath);
+            foreach (string file in files)
+            {
+                return file;
+            }
+            string[] directories = Directory.GetDirectories(directoryPath);
+            foreach (string directory in directories)
+            {
+                return GetFirstFilePath(directory);
+            }
+            return "";
+        }
+        private async Task moveFileDirectoryAsync(string filePath, string directoryPath)
+        {
+            string mv = "-c \"mv " + Path.GetDirectoryName(filePath) + "/* " + directoryPath;
+            await ExecuteAsync(mv);
+            string rm = "-c \"rm -fR " + Path.GetDirectoryName(filePath);
+            await ExecuteAsync(rm);
+        }
+        private void ReplaceJavaPackage(string directoryPath)
+        {
+            try
+            {
+
+                List<string> filePaths = GetFilePaths(directoryPath);
+                Regex reg = new Regex(@"package [a-zA-Z0-9\.]*;");
+                foreach (string filePath in filePaths)
+                {
+                    using (StreamReader sr = new StreamReader(filePath))
+                    {
+                        string fileText = sr.ReadToEnd();
+                        string replaceText = reg.Replace(fileText, "");
+                        using (StreamWriter sw = new StreamWriter(filePath, false))
+                        {
+                            sw.Write(replaceText);
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                return;
+            }
         }
     }
 }

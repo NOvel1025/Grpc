@@ -8,6 +8,7 @@ using Grpc.Net.Client;
 using GrpcClient;
 using GrpcClient.Models;
 using Google.Protobuf.WellKnownTypes;
+using System.Text.RegularExpressions;
 
 namespace GrpcClient
 {
@@ -35,7 +36,7 @@ namespace GrpcClient
             }
             for (int i = 0; i < AutoExecList.Count; i++)
             {
-                #pragma warning disable CS4014 //呼び出しの完了は待たない
+#pragma warning disable CS4014 //呼び出しの完了は待たない
                 AutoExecClientAsync(AutoExecList[i], i);
             }
 
@@ -60,12 +61,30 @@ namespace GrpcClient
                 {
                     AutoContainerArguments autoContainerArguments = new AutoContainerArguments(server.ResponseStream.Current, i);
                     Console.WriteLine(server.ResponseStream.Current.ToString());
-                    if (!autoContainerArguments.AvailableLanguages.Any(value => value == autoContainerArguments.Lang))
+                    if (!autoContainerArguments.IsAvailableLanguage)
                     {
                         await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = "not available language.", AnswerFile = "not available language.", Correction = 0 });
                         continue;
                     }
-                    
+                    else if (!autoContainerArguments.IsZip && !autoContainerArguments.IsAvailableExtension)
+                    {
+                        if (autoContainerArguments.MatchType == 0)
+                        {
+                            Console.WriteLine("iszip:" + autoContainerArguments.IsZip);
+                            Console.WriteLine("isAvailableExtension:" + autoContainerArguments.IsAvailableExtension);
+                            Console.WriteLine("-----1-----");
+                            await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = "実行できません", AnswerFile = "", Correction = 0 });
+                            continue;
+                        }
+                        else
+                        {
+                            Console.WriteLine(autoContainerArguments.ToString());
+                            Console.WriteLine("-----2-----");
+                            await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = "実行できません", AnswerFile = "", Correction = 2 });
+                            continue;
+                        }
+                    }
+
                     Command autoExec = new Command(autoContainerArguments.ContainerName, autoContainerArguments.Lang, true, autoContainerArguments.InputStr);
                     StandardCmd submissionFileResult = await autoExec.AutoExecAsync(autoContainerArguments.SubmissionFiles);
                     if (autoContainerArguments.MatchType == 0)
@@ -75,18 +94,13 @@ namespace GrpcClient
                             await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = submissionFileResult.Output, AnswerFile = "", Correction = 0 });
                             continue;
                         }
-                        else if(autoContainerArguments.IsZip)
+                        else
                         {
                             await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = submissionFileResult.Error, AnswerFile = "", Correction = 0 });
                             continue;
                         }
-                        else
-                        {
-                            await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = submissionFileResult.Error, AnswerFile = "", Correction = 2 });
-                            continue;
-                        }
                     }
-                    
+
                     Comparison comparison = new();
 
                     StandardCmd answerFileResult = await autoExec.AutoExecAsync(autoContainerArguments.AnswerFiles);
@@ -163,7 +177,7 @@ namespace GrpcClient
             }
             for (int i = 0; i < ManualExecList.Count; i++)
             {
-                #pragma warning disable CS4014 // 呼び出しの完了は待たない
+#pragma warning disable CS4014 // 呼び出しの完了は待たない
                 ManualExecAsync(ManualExecList[i], i);
             }
 
@@ -190,10 +204,10 @@ namespace GrpcClient
                     {
                         StandardCmd result = new StandardCmd();
                         Command manualExec = new Command(manualContainerArguments.ContainerName, manualContainerArguments.Lang, manualContainerArguments.RequestWriteAsync, manualContainerArguments.SetStreamWriter);
-                        int n = 0;
-                        for (; n < 5; n++)
+                        int retryCount = 0;
+                        for (; retryCount < 5; retryCount++)
                         {
-                            result = await manualExec.ManualExecAsync(manualContainerArguments.SubmissionFiles);
+                            result = await manualExec.ManualExecAsync(manualContainerArguments.SubmissionFiles, manualContainerArguments.IsAvailableExtension, manualContainerArguments.IsZip);
                             if (result.ExitCode == 0)
                             {
                                 break;
@@ -204,7 +218,7 @@ namespace GrpcClient
                             await manualExec.DiscardContainerAsync();
                             await Task.Delay(100);
                         }
-                        if (4 <= n)
+                        if (4 <= retryCount)
                         {
                             manualContainerArguments.IsSend = true;
                             await manualContainerArguments.RequestWriteAsync("接続できません: " + result.Error + "\n");
@@ -240,6 +254,14 @@ namespace GrpcClient
                             {
                                 manualContainerArguments.IsSend = false;
                                 break;
+                            }
+                            else if (executionInputStr.ToLower().Contains("-tab"))
+                            {
+                                manualContainerArguments.IsSend = false;
+                                string str = await manualExec.PressTabAsync(executionInputStr);
+                                manualContainerArguments.IsSend = true;
+                                await manualContainerArguments.RequestWriteAsync(str);
+                                continue;
                             }
                             if (manualContainerArguments.IsDoProcess)
                             {
