@@ -35,14 +35,16 @@ namespace GrpcClient
             }
             for (int i = 0; i < AutoExecList.Count; i++)
             {
+                #pragma warning disable CS4014 //呼び出しの完了は待たない
                 AutoExecClientAsync(AutoExecList[i], i);
             }
 
             while (true) { await Task.Delay(10000); }
-            foreach (var server in AutoExecList)
-            {
-                await server.RequestStream.CompleteAsync();
-            }
+            //無限ループでリクエストストリームを閉じない
+            // foreach (var server in AutoExecList)
+            // {
+            //     await server.RequestStream.CompleteAsync();
+            // }
         }
         //自動実行コンテナの作成とサーバーとの接続
         public async Task AutoExecClientAsync(AsyncDuplexStreamingCall<ExecutionResult, SubmissionInformation> server, int i)
@@ -161,6 +163,7 @@ namespace GrpcClient
             }
             for (int i = 0; i < ManualExecList.Count; i++)
             {
+                #pragma warning disable CS4014 // 呼び出しの完了は待たない
                 ManualExecAsync(ManualExecList[i], i);
             }
 
@@ -255,7 +258,7 @@ namespace GrpcClient
                                     StandardCmd cmdContainerResult = await task;
                                     if (cmdContainerResult.ExitCode != 0)
                                     {
-                                        manualContainerArguments.RequestWriteAsync(cmdContainerResult.Error);
+                                        await manualContainerArguments.RequestWriteAsync(cmdContainerResult.Error);
                                     }
                                     manualContainerArguments.IsDoProcess = false;
                                     manualContainerArguments.IsSend = false;

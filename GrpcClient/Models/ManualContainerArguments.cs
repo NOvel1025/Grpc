@@ -23,9 +23,10 @@ namespace GrpcClient.Models
             ManualExecStream = null;
             RequestWriteAsync = (async (string str) =>
             {
-                Console.Write(str);
+                str = str ?? "";
                 if (IsSend)
                 {
+                    #pragma warning disable CS8602 //初期化ができない
                     await ManualExecStream.RequestStream.WriteAsync(new ExecutionOutput { ExecutionOutputStr = str });
                 }
             });
@@ -44,7 +45,7 @@ namespace GrpcClient.Models
         public bool IsDoProcess { get; set; }
         public bool IsEndConnect { get; set; }
         public StreamWriter? InputStream { get; set; }
-        public AsyncDuplexStreamingCall<ExecutionOutput, ExecutionInput> ManualExecStream { get; set; }
+        public AsyncDuplexStreamingCall<ExecutionOutput, ExecutionInput>? ManualExecStream { get; set; }
         public Func<string, Task> RequestWriteAsync { get; set; }
         public Action<StreamWriter> SetStreamWriter { get; set; }
         private string[] _warningLang = new string[]{
