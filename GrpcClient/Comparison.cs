@@ -37,7 +37,7 @@ namespace GrpcClient
         {
             diff_match_patch dmp = new();
             string matchString = "";
-            for (int i = 0; i < fileNames.Length - 1; i++)
+            for (int i = 0; i < fileNames.Length; i++)
             {
                 if (i == 0)
                 {
