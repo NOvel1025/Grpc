@@ -361,124 +361,102 @@ namespace GrpcClient
             string cmdStr = "-c \"docker exec -i -w /opt/data " + _containerName + " bash -c 'rm -Rf " + fileName + "\"";
             return await ExecuteAsync(cmdStr);
         }
-        public async Task<string> PressTabAsync(string str)
+        public async Task<string> TabCompletionAsync(string inputCommandString)
         {
             _isAuto = true;
-            bool isFirstArgument = true;
-            bool isSecondEmpty = false;
-            Regex reg = new Regex("-tab");
-            str = reg.Replace(str, "", 1);
-            if (str == "")
+            // bool isFirstArgument = true;
+            // bool isSecondEmpty = false;
+            string result = "";
+
+
+            Regex removeTabCommandReg = new Regex("-tab" + @".*");
+            inputCommandString = removeTabCommandReg.Replace(inputCommandString, "");
+
+            string[] inputStrings = inputCommandString.Split(" ");
+            string inputStringLastWord = inputStrings[inputStrings.Length - 1];
+            Regex optionDecision = new Regex("-" + @"[a-zA-Z0-9]+");
+            if (!optionDecision.IsMatch(inputStringLastWord))
             {
-                isFirstArgument = false;
-            }
-            string[] command = str.TrimEnd().Split(" ");
-            foreach (string s in command)
-            {
-                str = s.Trim();
-            }
-            string judgeFolder = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c 'ls -l | grep ^d'\"";
-            StandardCmd result = await ExecuteAsync(judgeFolder);
-            List<string> folders = new List<string>();
-            folders = result.Output.TrimEnd().Split("\n").ToList();
-            for (int i = 0; i < folders.Count; i++)
-            {
-                Console.WriteLine("folder[i].Split(\" \")[folder[i].Split(\" \").Length - 1]:" + folders[i].Split(" ")[folders[i].Split(" ").Length - 1]);
-                folders[i] = folders[i].Split(" ")[folders[i].Split(" ").Length - 1];
-                Console.WriteLine("folder[i]:" + folders[i]);
-            }
-            Console.WriteLine("folder[folder.length - 1]:" + folders[0]);
-            Console.ReadKey();
-            string filenamePrediction = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c 'ls -d " + str + "*'\"";
-            result = await ExecuteAsync(filenamePrediction);
-            if (result.ExitCode != 0)
-            {
-                isSecondEmpty = true;
-                string filenamePredictionRetry = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c 'ls'\"";
-                result = await ExecuteAsync(filenamePredictionRetry);
-            }
-            if (result.ExitCode != 0)
-            {
-                _isAuto = false;
-                return "";
-            }
-            else
-            {
-                string[] files = result.Output.TrimEnd().Split("\n");
-                if (files.Length == 1)
+                //inputStringsが一つならコマンド入力中と判定
+                if (inputStrings.Length == 1)
                 {
-                    Regex reg2 = new Regex(str);
-                    str = reg2.Replace(files[0], "", 1);
-                    _isAuto = false;
-                    return str;
+                    //コマンドを検索
                 }
                 else
                 {
-                    if (isSecondEmpty)
+                    //フォルダーまたはファイルを検索
+                    string judgeFolderCommand = "";
+                    if (inputStringLastWord == "")
                     {
-                        str = "";
+                        judgeFolderCommand = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c 'ls -l | grep ^d'\"";
                     }
                     else
                     {
+                        judgeFolderCommand = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c 'ls -ld " + inputStringLastWord + "* | grep ^d'\"";
+                    }
+                    StandardCmd judgeFolderResult = await ExecuteAsync(judgeFolderCommand);
+                    List<string> folderNameList = new List<string>();
+                    folderNameList = judgeFolderResult.Output.TrimEnd().Split("\n").ToList();
+                    for (int i = 0; i < folderNameList.Count; i++)
+                    {
+                        //フォルダ名だけ取得
+                        folderNameList[i] = folderNameList[i].Split(" ")[folderNameList[i].Split(" ").Length - 1];
+                    }
+
+                    string getFileNameCommand = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c 'ls -d " + inputStringLastWord + "*'\"";
+                    StandardCmd getFileNameResult = await ExecuteAsync(getFileNameCommand);
+                    string[] fileNames = getFileNameResult.Output.TrimEnd().Split("\n");
+                    result += "\n";
+                    //フォルダなら最後に"/"をつけてファイル名から/を消す
+                    for (int i = 0; i < fileNames.Length; i++)
+                    {
+                        fileNames[i] = Path.GetFileName(fileNames[i]);
+                        for (int j = 0; j < folderNameList.Count; j++)
+                        {
+                            if (fileNames[i] == folderNameList[j] && Path.GetExtension(fileNames[i]) == "")
+                            {
+                                fileNames[i] += "/";
+                            }
+                        }
+                        result += (fileNames[i] + "  ");
+                    }
+                    result.TrimEnd();
+                    result += "\n[" + (await CurrentDirectoryContainerAsync()).Output.Trim() + "]# ";
+                    //入力してあったものを入れなおす
+                    if (inputStringLastWord == "")
+                    {
+                        result += inputCommandString;
+                    }
+                    else
+                    {
+                        for (int i = 0; i < inputStrings.Length - 1; i++)
+                        {
+                            result += (inputStrings[i] + " ");
+                        }
+                        result += inputStringLastWord;
+                        Console.WriteLine("Result:\n" + result + ";");
+
+                        //inputStringsの最後の要素とマッチするファイルまたはフォルダを検索
                         Comparison comparison = new Comparison();
-                        str = comparison.FirstMatchString(files);
-                    }
-
-                    string filesString = "";
-                    string[] fileNamesString = result.Output.Split("\n");
-                    Console.WriteLine("result.Output:" + result.Output);
-                    Console.WriteLine("filesString.Length:" + filesString.Length);
-                    for (int i = 0; i < fileNamesString.Length; i++)
-                    {
-                        Console.WriteLine("Path:" + Path.GetFileName(fileNamesString[i]));
-                        fileNamesString[i] = Path.GetFileName(fileNamesString[i]);
-                        for (int j = 0; j < folders.Count; j++)
+                        string[] inputStringSlashByDelimiteds = inputStringLastWord.Split("/");
+                        string inputStringSlashByDelimitedLastWord = inputStringSlashByDelimiteds[inputStringSlashByDelimiteds.Length - 1];
+                        if (inputStringSlashByDelimitedLastWord == "")
                         {
-                            if (fileNamesString[i] == folders[j])
-                            {
-                                fileNamesString[i] += "/";
-                                folders.Remove(folders[j]);
-                            }
+                            result += comparison.FirstMatchString(fileNames);
                         }
-
-                    }
-                    filesString = "\n";
-                    foreach (string fileNameString in fileNamesString)
-                    {
-                        Console.WriteLine(fileNameString);
-                        filesString += fileNameString + "  ";
-                    }
-                    filesString.TrimEnd();
-                    filesString += "\n[" + (await CurrentDirectoryContainerAsync()).Output.Trim() + "]# ";
-                    Console.WriteLine("command.Length:" + command.Length);
-                    if (isSecondEmpty)
-                    {
-                        filesString += command[0] + " ";
-                    }
-                    else if (!isFirstArgument) { }
-                    else if (command.Length == 1)
-                    {
-                        filesString += str;
-                    }
-                    else
-                    {
-                        if (command.Length >= 2)
+                        else
                         {
-                            Regex option = new Regex(@"^-[a-zA-Z]+");
-                            foreach (string s in command)
-                            {
-                                //ここ編集
-                                if(option.IsMatch(s)){
-
-                                }
-                            }
+                            Console.WriteLine("match:" + comparison.FirstMatchString(fileNames).Replace(inputStringSlashByDelimitedLastWord, "") + ";");
+                            result += comparison.FirstMatchString(fileNames).Replace(inputStringSlashByDelimitedLastWord, "");
                         }
-                        filesString += command[0] + " " + str;
                     }
-                    _isAuto = false;
-                    return filesString;
                 }
             }
+            else
+            {
+            }
+            _isAuto = false;
+            return result;
         }
         public async Task<StandardCmd> CompileJavaAsync(string directoryPath, string fileName)
         {

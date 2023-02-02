@@ -258,7 +258,7 @@ namespace GrpcClient
                             else if (executionInputStr.ToLower().Contains("-tab"))
                             {
                                 manualContainerArguments.IsSend = false;
-                                string str = await manualExec.PressTabAsync(executionInputStr);
+                                string str = await manualExec.TabCompletionAsync(executionInputStr);
                                 manualContainerArguments.IsSend = true;
                                 await manualContainerArguments.RequestWriteAsync(str);
                                 continue;

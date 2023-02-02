@@ -41,19 +41,8 @@ namespace GrpcClient
             {
                 if (i == 0)
                 {
+                    matchString = fileNames[i];
                     continue;
-                }
-                if (matchString == "")
-                {
-                    List<Diff> diffList = dmp.diff_main(fileNames[i - 1], fileNames[i]);
-                    foreach (Diff diff in diffList)
-                    {
-                        if (diff.operation.ToString() == "EQUAL")
-                        {
-                            matchString = diff.text;
-                            break;
-                        }
-                    }
                 }
                 else
                 {
@@ -63,6 +52,11 @@ namespace GrpcClient
                         if (diff.operation.ToString() == "EQUAL")
                         {
                             matchString = diff.text;
+                            break;
+                        }
+                        else
+                        {
+                            matchString = "";
                             break;
                         }
                     }
