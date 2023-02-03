@@ -99,54 +99,39 @@ namespace GrpcClient
                     StandardCmd answerFileResult = await autoExec.AutoExecAsync(autoContainerArguments.AnswerFiles);
                     ExecutionResult executionResult = new ExecutionResult();
 
-                    if (submissionFileResult.ExitCode == 0 && answerFileResult.ExitCode == 0)
+                    if (submissionFileResult.ExitCode == 0)
                     {
                         autoContainerArguments.SubmissionFileResult = submissionFileResult.Output;
+                    }
+                    else
+                    {
+                        autoContainerArguments.SubmissionFileResult = submissionFileResult.Error;
+                        autoContainerArguments.Correction = 2;
+                    }
+                    if (answerFileResult.ExitCode == 0)
+                    {
                         autoContainerArguments.AnswerFileResult = answerFileResult.Output;
                     }
                     else
                     {
-                        autoContainerArguments.MatchType = 0;
-                        if (submissionFileResult.ExitCode != 0)
-                        {
-                            autoContainerArguments.SubmissionFileResult = submissionFileResult.Error;
-                            autoContainerArguments.Correction = 2;
-                        }
-                        else
-                        {
-                            autoContainerArguments.SubmissionFileResult = submissionFileResult.Output;
-                        }
-                        if (answerFileResult.ExitCode != 0)
-                        {
-                            autoContainerArguments.AnswerFileResult = answerFileResult.Error;
-                            autoContainerArguments.Correction = 2;
-                        }
-                        else
-                        {
-                            autoContainerArguments.AnswerFileResult = answerFileResult.Output;
-                        }
+                        autoContainerArguments.AnswerFileResult = answerFileResult.Error;
+                        autoContainerArguments.Correction = 2;
                     }
-                    if (autoContainerArguments.MatchType == 1)
+
+                    if (autoContainerArguments.Correction != 2)
                     {
-                        autoContainerArguments.CorrectionBool
-                            = comparison.CompareFilesExactMatch(autoContainerArguments.SubmissionFileResult, autoContainerArguments.AnswerFileResult);
-                    }
-                    else if (autoContainerArguments.MatchType == 2)
-                    {
-                        autoContainerArguments.CorrectionBool
-                            = comparison.CompareFilesMatch(autoContainerArguments.SubmissionFileResult, autoContainerArguments.AnswerFileResult);
-                    }
-                    if (autoContainerArguments.MatchType != 0)
-                    {
-                        if (autoContainerArguments.CorrectionBool)
+                        if (autoContainerArguments.MatchType == 1)
                         {
-                            autoContainerArguments.Correction = 0;
+                            autoContainerArguments.Correction
+                                = comparison.CompareFilesExactMatch(autoContainerArguments.SubmissionFileResult, autoContainerArguments.AnswerFileResult);
                         }
-                        else
+                        else if (autoContainerArguments.MatchType == 2)
                         {
-                            autoContainerArguments.Correction = 1;
+                            autoContainerArguments.Correction
+                                = comparison.CompareFilesMatch(autoContainerArguments.SubmissionFileResult, autoContainerArguments.AnswerFileResult);
                         }
                     }
+
                     executionResult.SubmissionFile = autoContainerArguments.SubmissionFileResult;
                     executionResult.AnswerFile = autoContainerArguments.AnswerFileResult;
                     executionResult.Correction = autoContainerArguments.Correction;

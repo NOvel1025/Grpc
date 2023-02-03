@@ -100,53 +100,66 @@ namespace GrpcClient
         {
             StandardCmd result = new();
             string mainFile = "";
+            // ファイルが保存されるパスを指定
             string directoryPath = "./executeFiles/" + _containerName + "/data";
+            // 5回試行して、エラーだったら何もせず抜ける
             for (int i = 0; i < 5; i++)
             {
+                // 実行用環境の構築
                 if ((result = await BuildExecuteEnvironmentAsync()).ExitCode == 0)
                 {
+                    // 送られてきたファイル情報を1つずつ読み取る
                     foreach (FileInformation fileInformation in fileInformations)
                     {
+                        // ダウンロードするファイルのパスを生成
                         string filePath = directoryPath + "/" + fileInformation.FileName;
+                        // ファイルをダウンロード
                         await DownloadFileAsync(_ex2PlusUrl + fileInformation.FileId + _apiKey, filePath);
+                        // ダウンロードしたファイルがzipか判定
                         if (fileInformation.FileName.ToLower().Contains("zip"))
                         {
+                            // zipを展開
                             if ((result = await UnzipAsync(filePath)).ExitCode == 0)
                             {
+                                // zipファイルの中のメインファイルの要素を含むファイルをmainFileに格納
                                 mainFile = Path.GetFileName(await JudgeUnzipMainFileAsync(directoryPath));
                             }
                         }
+                        // zipじゃないかつメインファイルの要素を含んでいたらmainFileにファイル名を格納
                         else if (JudgeMainFile(filePath))
                         {
                             mainFile = fileInformation.FileName;
                         }
                     }
-                    if (_notCompileLanguage.Any(value => value == _lang) && mainFile == "")
+                    // mainFileが空か判定
+                    if (mainFile == "")
                     {
-                        if ((mainFile = JudgeMainFile(fileInformations)) == "")
+                        // コンパイルしない言語なら最初に見つかったファイルをmianFileに格納、コンパイルする言語ならエラー
+                        if (_notCompileLanguage.Any(value => value == _lang))
+                        {
+                            if ((mainFile = JudgeMainFile(fileInformations)) == "")
+                            {
+                                return new StandardCmd("File not found.", "File not found.", -1);
+                            }
+                        }
+                        else
                         {
                             return new StandardCmd("File not found.", "File not found.", -1);
                         }
                     }
                     else
                     {
-                        if (!_notCompileLanguage.Any(value => value == _lang) && mainFile != "")
+                        // コンパイルする言語ならコンパイル
+                        if (!_notCompileLanguage.Any(value => value == _lang))
                         {
-                            result = await CompileAsync(directoryPath, mainFile);
+                            if ((result = await CompileAsync(directoryPath, mainFile)).ExitCode != 0)
+                            {
+                                return new StandardCmd("compile error", "compile error", -1);
+                            }
                         }
                     }
-                    if (result.ExitCode == 0 && mainFile != "")
-                    {
-                        if (mainFile != "")
-                        {
-                            result = await ExecuteFileAsync(mainFile);
-                        }
-                        else
-                        {
-                            result = new StandardCmd("File not found.", "File not found.", -1);
-                        }
-                    }
-
+                    // 実行
+                    result = await ExecuteFileAsync(mainFile);
                     break;
                 }
                 await DiscardContainerAsync();
@@ -351,14 +364,17 @@ namespace GrpcClient
         {
             _isAuto = true;
             string result = "";
-
+            //入力されている文字列から-tabを削除
             Regex removeTabCommandReg = new Regex("-tab" + @".*");
             inputCommandString = removeTabCommandReg.Replace(inputCommandString, "");
 
+            // 入力されている文字をスペーズで区切る
             string[] inputStrings = inputCommandString.Split(" ");
+            // 最後の文字列を取得
             string inputStringLastWord = inputStrings[inputStrings.Length - 1];
             Regex optionDecision = new Regex(@"^" + "-" + @"[a-zA-Z0-9]*");
             List<string> fileNameList = new List<string>();
+            // 最後の文字列が"-"から始まってたらオプションと判断し、なにもしない
             if (!optionDecision.IsMatch(inputStringLastWord))
             {
                 //inputStringsが一つならコマンド入力中と判定
@@ -404,10 +420,12 @@ namespace GrpcClient
 
                     string getFileNameCommand = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c 'ls -d " + inputStringLastWord + "*'\"";
                     StandardCmd getFileNameResult = await ExecuteAsync(getFileNameCommand);
+                    // 実行結果からファイル名を取り出し、リストに格納
                     foreach (string fileName in getFileNameResult.Output.TrimEnd().Split("\n"))
                     {
                         fileNameList.Add(fileName);
                     }
+                    // リストの最初の要素がなかったら検索結果が0とみなし何もしない
                     if (fileNameList[0] != "")
                     {
                         result += "\n";
@@ -427,6 +445,7 @@ namespace GrpcClient
                         result.TrimEnd();
                     }
                 }
+                // リストの最初の要素がなかったら検索結果が0とみなし何もしない
                 if (fileNameList[0] != "")
                 {
                     result += "\n[" + (await CurrentDirectoryContainerAsync()).Output.Trim() + "]# ";
@@ -453,14 +472,11 @@ namespace GrpcClient
                         }
                         else
                         {
+                            // もともと入力されていた部分とかぶるところを消してから結果に格納
                             result += comparison.FirstMatchString(fileNameList).Replace(inputStringSlashByDelimitedLastWord, "");
                         }
                     }
                 }
-
-            }
-            else
-            {
             }
             _isAuto = false;
             return result;
@@ -489,7 +505,6 @@ namespace GrpcClient
             else if (_lang == "clang")
             {
                 mainFilePath = directoryPath + "/" + mainFile;
-                compile += GenerateCompileString(directoryPath, mainFile) + "\"";
             }
             else
             {

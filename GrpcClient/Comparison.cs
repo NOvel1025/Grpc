@@ -6,18 +6,18 @@ namespace GrpcClient
 {
     class Comparison
     {
-        public bool CompareFilesMatch(string submissionFile, string answerFile)
+        public int CompareFilesMatch(string submissionFile, string answerFile)
         {
             Regex reg = new Regex("[\\s]");
             string submissionResult = reg.Replace(submissionFile, "");
             string answerFileResult = reg.Replace(answerFile, "");
             return Compare(submissionResult, answerFileResult);
         }
-        public bool CompareFilesExactMatch(string submissionFile, string answerFile)
+        public int CompareFilesExactMatch(string submissionFile, string answerFile)
         {
             return Compare(submissionFile, answerFile);
         }
-        private bool Compare(string submissionFile, string answerFile)
+        private int Compare(string submissionFile, string answerFile)
         {
             diff_match_patch dmp = new();
             List<Diff> diffList = dmp.diff_main(submissionFile, answerFile);
@@ -28,10 +28,10 @@ namespace GrpcClient
                     continue;
                 }
 
-                return false;
+                return 1;
 
             }
-            return true;
+            return 0;
         }
         public string FirstMatchString(List<string> fileNameList)
         {
