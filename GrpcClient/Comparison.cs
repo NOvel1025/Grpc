@@ -33,20 +33,20 @@ namespace GrpcClient
             }
             return true;
         }
-        public string FirstMatchString(string[] fileNames)
+        public string FirstMatchString(List<string> fileNameList)
         {
             diff_match_patch dmp = new();
             string matchString = "";
-            for (int i = 0; i < fileNames.Length; i++)
+            for (int i = 0; i < fileNameList.Count; i++)
             {
                 if (i == 0)
                 {
-                    matchString = fileNames[i];
+                    matchString = fileNameList[i];
                     continue;
                 }
                 else
                 {
-                    List<Diff> diffList = dmp.diff_main(fileNames[i], matchString);
+                    List<Diff> diffList = dmp.diff_main(fileNameList[i], matchString);
                     foreach (Diff diff in diffList)
                     {
                         if (diff.operation.ToString() == "EQUAL")

@@ -36,8 +36,7 @@ namespace GrpcClient
             }
             for (int i = 0; i < AutoExecList.Count; i++)
             {
-#pragma warning disable CS4014 //呼び出しの完了は待たない
-                AutoExecClientAsync(AutoExecList[i], i);
+                _ = AutoExecClientAsync(AutoExecList[i], i);
             }
 
             while (true) { await Task.Delay(10000); }
@@ -54,7 +53,6 @@ namespace GrpcClient
             {
                 if (server == null)
                 {
-                    Console.WriteLine("serverがnullです。");
                     return;
                 }
                 while (await server.ResponseStream.MoveNext(cancellationToken: CancellationToken.None))
@@ -70,16 +68,11 @@ namespace GrpcClient
                     {
                         if (autoContainerArguments.MatchType == 0)
                         {
-                            Console.WriteLine("iszip:" + autoContainerArguments.IsZip);
-                            Console.WriteLine("isAvailableExtension:" + autoContainerArguments.IsAvailableExtension);
-                            Console.WriteLine("-----1-----");
                             await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = "実行できません", AnswerFile = "", Correction = 0 });
                             continue;
                         }
                         else
                         {
-                            Console.WriteLine(autoContainerArguments.ToString());
-                            Console.WriteLine("-----2-----");
                             await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = "実行できません", AnswerFile = "", Correction = 2 });
                             continue;
                         }
@@ -177,8 +170,7 @@ namespace GrpcClient
             }
             for (int i = 0; i < ManualExecList.Count; i++)
             {
-#pragma warning disable CS4014 // 呼び出しの完了は待たない
-                ManualExecAsync(ManualExecList[i], i);
+                _ = ManualExecAsync(ManualExecList[i], i);
             }
 
             while (true) { await Task.Delay(10000); }

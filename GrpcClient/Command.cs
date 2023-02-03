@@ -350,23 +350,36 @@ namespace GrpcClient
         public async Task<string> TabCompletionAsync(string inputCommandString)
         {
             _isAuto = true;
-            // bool isFirstArgument = true;
-            // bool isSecondEmpty = false;
             string result = "";
-
 
             Regex removeTabCommandReg = new Regex("-tab" + @".*");
             inputCommandString = removeTabCommandReg.Replace(inputCommandString, "");
 
             string[] inputStrings = inputCommandString.Split(" ");
             string inputStringLastWord = inputStrings[inputStrings.Length - 1];
-            Regex optionDecision = new Regex("-" + @"[a-zA-Z0-9]+");
+            Regex optionDecision = new Regex(@"^" + "-" + @"[a-zA-Z0-9]*");
+            List<string> fileNameList = new List<string>();
             if (!optionDecision.IsMatch(inputStringLastWord))
             {
                 //inputStringsが一つならコマンド入力中と判定
                 if (inputStrings.Length == 1)
                 {
                     //コマンドを検索
+                    string searchCommandCommand = "-c \"docker exec -i -w /usr/bin " + _containerName + " bash -c 'ls | grep ^" + inputStringLastWord + "'\"";
+                    StandardCmd searchCommandResult = await ExecuteAsync(searchCommandCommand);
+                    if (searchCommandResult.ExitCode == 0 && searchCommandResult.Output.Split("\n")[0] != "")
+                    {
+                        result = "\n";
+                        foreach (string commandCompletion in searchCommandResult.Output.TrimEnd().Split("\n"))
+                        {
+                            fileNameList.Add(commandCompletion);
+                        }
+                        foreach (string commandCompletion in fileNameList)
+                        {
+                            result += commandCompletion + "  ";
+                        }
+                        result.TrimEnd();
+                    }
                 }
                 else
                 {
@@ -391,22 +404,31 @@ namespace GrpcClient
 
                     string getFileNameCommand = "-c \"docker exec -i -w " + _path + " " + _containerName + " bash -c 'ls -d " + inputStringLastWord + "*'\"";
                     StandardCmd getFileNameResult = await ExecuteAsync(getFileNameCommand);
-                    string[] fileNames = getFileNameResult.Output.TrimEnd().Split("\n");
-                    result += "\n";
-                    //フォルダなら最後に"/"をつけてファイル名から/を消す
-                    for (int i = 0; i < fileNames.Length; i++)
+                    foreach (string fileName in getFileNameResult.Output.TrimEnd().Split("\n"))
                     {
-                        fileNames[i] = Path.GetFileName(fileNames[i]);
-                        for (int j = 0; j < folderNameList.Count; j++)
-                        {
-                            if (fileNames[i] == folderNameList[j] && Path.GetExtension(fileNames[i]) == "")
-                            {
-                                fileNames[i] += "/";
-                            }
-                        }
-                        result += (fileNames[i] + "  ");
+                        fileNameList.Add(fileName);
                     }
-                    result.TrimEnd();
+                    if (fileNameList[0] != "")
+                    {
+                        result += "\n";
+                        //フォルダなら最後に"/"をつけてファイル名から/を消す
+                        for (int i = 0; i < fileNameList.Count; i++)
+                        {
+                            fileNameList[i] = Path.GetFileName(fileNameList[i]);
+                            for (int j = 0; j < folderNameList.Count; j++)
+                            {
+                                if (fileNameList[i] == folderNameList[j] && Path.GetExtension(fileNameList[i]) == "")
+                                {
+                                    fileNameList[i] += "/";
+                                }
+                            }
+                            result += (fileNameList[i] + "  ");
+                        }
+                        result.TrimEnd();
+                    }
+                }
+                if (fileNameList[0] != "")
+                {
                     result += "\n[" + (await CurrentDirectoryContainerAsync()).Output.Trim() + "]# ";
                     //入力してあったものを入れなおす
                     if (inputStringLastWord == "")
@@ -420,7 +442,6 @@ namespace GrpcClient
                             result += (inputStrings[i] + " ");
                         }
                         result += inputStringLastWord;
-                        Console.WriteLine("Result:\n" + result + ";");
 
                         //inputStringsの最後の要素とマッチするファイルまたはフォルダを検索
                         Comparison comparison = new Comparison();
@@ -428,15 +449,15 @@ namespace GrpcClient
                         string inputStringSlashByDelimitedLastWord = inputStringSlashByDelimiteds[inputStringSlashByDelimiteds.Length - 1];
                         if (inputStringSlashByDelimitedLastWord == "")
                         {
-                            result += comparison.FirstMatchString(fileNames);
+                            result += comparison.FirstMatchString(fileNameList);
                         }
                         else
                         {
-                            Console.WriteLine("match:" + comparison.FirstMatchString(fileNames).Replace(inputStringSlashByDelimitedLastWord, "") + ";");
-                            result += comparison.FirstMatchString(fileNames).Replace(inputStringSlashByDelimitedLastWord, "");
+                            result += comparison.FirstMatchString(fileNameList).Replace(inputStringSlashByDelimitedLastWord, "");
                         }
                     }
                 }
+
             }
             else
             {
