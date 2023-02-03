@@ -37,7 +37,7 @@ namespace GrpcClient
         /// <summary>
         /// Ex2のダウンロードコントローラのAPI
         /// </summary>
-        private string _ex2PlusUrl = "http://10.40.112.110:5556/api/GrpcDownload/";
+        private string _ex2PlusUrl = "http://126.114.253.21:5556/api/GrpcDownload/";
         /// <summary>
         /// Ex2のダウンロードAPIのキー
         /// </summary>
@@ -130,16 +130,9 @@ namespace GrpcClient
                     }
                     else
                     {
-                        if (mainFile != "")
+                        if (!_notCompileLanguage.Any(value => value == _lang) && mainFile != "")
                         {
-                            if (_lang == "clang")
-                            {
-                                result = await CompileClangAsync(directoryPath, mainFile);
-                            }
-                            if (_lang == "java11")
-                            {
-                                result = await CompileJavaAsync(directoryPath, mainFile);
-                            }
+                            result = await CompileAsync(directoryPath, mainFile);
                         }
                     }
                     if (result.ExitCode == 0 && mainFile != "")
@@ -208,19 +201,12 @@ namespace GrpcClient
                 }
                 else
                 {
-                    if (isZip && mainFile == "") { }
+                    if (_notCompileLanguage.Any(value => value == _lang) || (isZip && mainFile == "")) { }
                     else
                     {
                         if (mainFile != "")
                         {
-                            if (_lang == "clang")
-                            {
-                                result = await CompileClangAsync(directoryPath, mainFile);
-                            }
-                            if (_lang == "java11")
-                            {
-                                result = await CompileJavaAsync(directoryPath, mainFile);
-                            }
+                            result = await CompileAsync(directoryPath, mainFile);
                         }
                         else
                         {
@@ -458,66 +444,74 @@ namespace GrpcClient
             _isAuto = false;
             return result;
         }
-        public async Task<StandardCmd> CompileJavaAsync(string directoryPath, string fileName)
+        public async Task<StandardCmd> CompileAsync(string directoryPath, string mainFile)
         {
-            string filePath = "";
-            string generateDirectoryPath = "";
+            string compile = "-c \"docker exec -w /opt/bin " + _containerName + " bash ";
+            string mainFilePath = "";
             string insideContainerFilePath = "";
-            if ((generateDirectoryPath = await ReplaceJavaPackageAsync(directoryPath)) == "")
+            // 言語ごとに違う引数を渡す
+            if (_lang == "java11")
             {
-                filePath = directoryPath + "/" + fileName;
-                insideContainerFilePath = "/opt/data" + "/" + fileName;
+                string generateDirectoryPath = "";
+                if ((generateDirectoryPath = await ReplaceJavaPackageAsync(directoryPath)) == "")
+                {
+                    mainFilePath = directoryPath + "/" + mainFile;
+                    insideContainerFilePath = mainFile;
+                }
+                else
+                {
+                    mainFilePath = directoryPath + "/" + generateDirectoryPath;
+                    insideContainerFilePath = generateDirectoryPath;
+                    _generateDirectoryPath = generateDirectoryPath;
+                }
+            }
+            else if (_lang == "clang")
+            {
+                mainFilePath = directoryPath + "/" + mainFile;
+                compile += GenerateCompileString(directoryPath, mainFile) + "\"";
             }
             else
             {
-                filePath = directoryPath + "/" + generateDirectoryPath;
-                insideContainerFilePath = "/opt/data/" + generateDirectoryPath;
-                _generateDirectoryPath = generateDirectoryPath;
+                return new StandardCmd("compile error", "compile error", -1);
             }
-            string encode = judgeEncode(filePath);
-            string className = Path.GetFileNameWithoutExtension(fileName);
+
+            //エンコードを判定してコンパイル
+            string encode = judgeEncode(mainFilePath);
             if (encode.ToLower().Contains("utf-8"))
             {
-                string compile = "-c \"docker exec -w " + Path.GetDirectoryName(insideContainerFilePath) + " " + _containerName + " bash -c 'javac -encoding UTF-8 " + fileName + "'\"";
-                StandardCmd compileResult = await ExecuteAsync(compile);
-                if (compileResult.ExitCode == 0)
-                {
-                    return compileResult;
-                }
+                compile += "compile.sh ";
             }
-            if (encode.ToLower().Contains("sjis"))
+            else if (encode.ToLower().Contains("sjis"))
             {
-                string compileSjis = "-c \"docker exec -w " + Path.GetDirectoryName(insideContainerFilePath) + " " + _containerName + " bash -c 'javac -encoding Shift_JIS " + fileName + "'\"";
-                StandardCmd compileSjisResult = await ExecuteAsync(compileSjis);
-                if (compileSjisResult.ExitCode == 0)
-                {
-                    return compileSjisResult;
-                }
+                compile += "compile_sjis.sh ";
             }
-            return new StandardCmd("compile error encoding " + encode, "compile errorencoding " + encode, -1);
-        }
-        public async Task<StandardCmd> CompileClangAsync(string directoryPath, string mainFile)
-        {
-            string encode = judgeEncode(directoryPath + "/" + mainFile);
-            if (encode.ToLower().Contains("utf-8"))
+            else if (encode.ToLower().Contains("ascii"))
             {
-                string compile = "-c \"docker exec -w /opt/bin " + _containerName + " bash compile.sh ";
-                compile = GenerateCompileString(directoryPath, mainFile, compile);
-                StandardCmd compileResult = await ExecuteAsync(compile);
-                if (compileResult.ExitCode == 0)
-                {
-                    return compileResult;
-                }
+                compile += "compile_ascii.sh ";
             }
-            if (encode.ToLower().Contains("sjis"))
+            else
             {
-                string compileSjis = "-c \"docker exec -w /opt/bin " + _containerName + " bash compile_sjis.sh ";
-                compileSjis = GenerateCompileString(directoryPath, mainFile, compileSjis);
-                StandardCmd compileSjisResult = await ExecuteAsync(compileSjis);
-                if (compileSjisResult.ExitCode == 0)
-                {
-                    return compileSjisResult;
-                }
+                return new StandardCmd("compile error encoding " + encode, "compile errorencoding " + encode, -1);
+            }
+
+            // 言語ごとに違う引数を渡す
+            if (_lang == "java11")
+            {
+                compile += insideContainerFilePath;
+            }
+            else if (_lang == "clang")
+            {
+                compile += GenerateCompileString(directoryPath, mainFile) + "\"";
+            }
+            else
+            {
+                return new StandardCmd("compile error", "compile error", -1);
+            }
+
+            StandardCmd compileResult = await ExecuteAsync(compile);
+            if (compileResult.ExitCode == 0)
+            {
+                return compileResult;
             }
             return new StandardCmd("compile error", "compile error", -1);
         }
@@ -599,7 +593,10 @@ namespace GrpcClient
             StreamWriter sw = process.StandardInput;
             StreamReader sr = process.StandardOutput;
             string str = "";
-#pragma warning disable CS8602 //コンストラクタでセットしてるから大丈夫
+            if (_setStreamWriter == null)
+            {
+                return "error";
+            }
             _setStreamWriter(sw);
             bool isTimeOut = true;
 
@@ -744,15 +741,17 @@ namespace GrpcClient
                     str = str + (char)ch;
                     // Console.Write((char)ch);
                     await Task.Delay(1);
-#pragma warning disable CS8602 //コンストラクタでセットするから大丈夫
+                    if (_requestWriteAsync == null)
+                    {
+                        return "error";
+                    }
                     await _requestWriteAsync(((char)ch).ToString());
                 }
             }
-            finally
+            catch (Exception)
             {
-                // sr.Close();
+                return "error";
             }
-
             return str;
         }
         //
@@ -857,6 +856,7 @@ namespace GrpcClient
         {
             string mainFile = "";
             List<string> filePaths = GetFilePaths(directoryPath);
+            //全ファイルのパスを取得して、ファイルにメインファイルの要素が含まれるか検索
             foreach (string filePath in filePaths)
             {
                 if (JudgeMainFile(filePath))
@@ -864,6 +864,7 @@ namespace GrpcClient
                     mainFile = filePath;
                 }
             }
+            // メインファイルがあって、メインファイルのパスがdataの直下じゃない場合移動
             if (mainFile != "" && Path.GetFileName(Path.GetDirectoryName(mainFile)) != "data")
             {
                 await moveFileDirectoryAsync(mainFile, directoryPath);
@@ -871,15 +872,20 @@ namespace GrpcClient
             else if (mainFile == "")
             {
                 string firstFilePath = GetFirstFilePath(directoryPath);
-                await moveFileDirectoryAsync(firstFilePath, directoryPath);
+                if (Path.GetFileName(Path.GetDirectoryName(firstFilePath)) != "data")
+                {
+                    await moveFileDirectoryAsync(firstFilePath, directoryPath);
+                }
+                mainFile = firstFilePath;
             }
 
             return mainFile;
         }
-        private string GenerateCompileString(string diretoryPath, string mainFile, string compile)
+        private string GenerateCompileString(string diretoryPath, string mainFile)
         {
-            List<string> filesPath = GetFilePaths(diretoryPath);
-            foreach (string filePath in filesPath)
+            List<string> filePaths = GetFilePaths(diretoryPath);
+            string compile = "";
+            foreach (string filePath in filePaths)
             {
                 if (Path.GetFileName(filePath) == mainFile)
                 {
@@ -887,7 +893,7 @@ namespace GrpcClient
                     break;
                 }
             }
-            foreach (string filePath in filesPath)
+            foreach (string filePath in filePaths)
             {
                 if (Path.GetFileName(filePath) == mainFile)
                 {
@@ -903,7 +909,6 @@ namespace GrpcClient
                 }
             }
             compile.TrimEnd();
-            compile += "\"";
             return compile;
         }
         private List<string> GetFilePaths(string directoryPath)
@@ -929,7 +934,35 @@ namespace GrpcClient
             string[] files = Directory.GetFiles(directoryPath);
             foreach (string file in files)
             {
-                return file;
+                switch (_lang)
+                {
+                    case "java11":
+                        if (Path.GetExtension(file) == ".java")
+                        {
+                            return file;
+                        }
+                        break;
+                    case "clang":
+                        if (Path.GetExtension(file) == ".c")
+                        {
+                            return file;
+                        }
+                        break;
+                    case "python3":
+                        if (Path.GetExtension(file) == ".py")
+                        {
+                            return file;
+                        }
+                        break;
+                    case "php":
+                        if (Path.GetExtension(file) == ".php")
+                        {
+                            return file;
+                        }
+                        break;
+                    default:
+                        break;
+                }
             }
             string[] directories = Directory.GetDirectories(directoryPath);
             foreach (string directory in directories)

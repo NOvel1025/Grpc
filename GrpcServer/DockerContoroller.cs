@@ -80,6 +80,7 @@ namespace GrpcServer
                             int correction = cClientRequestCurrent.Correction;
                             ExecutionResult ans =
                                 new ExecutionResult { SubmissionFile = submissionFileResult, AnswerFile = answerFileResult, Correction = correction };
+                            cClient.Available = true;
                             return ans;
                         }
                     }
