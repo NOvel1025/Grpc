@@ -58,6 +58,13 @@ namespace GrpcClient
         private string[] _notCompileLanguage = new string[]{
             "php", "python3"
         };
+        /// <summary>
+        /// コンパイルする言語の列
+        /// </summary>
+        /// <value></value>
+        private string[] _compileLanguage = new String[]{
+            "java11", "clang"
+        };
         public Command(string containerName, string lang)
         {
             this._containerName = containerName;
@@ -139,28 +146,28 @@ namespace GrpcClient
                         {
                             if ((mainFile = JudgeMainFile(fileInformations)) == "")
                             {
-                                return new StandardCmd("File not found.", "File not found.", -1);
+                                result = new StandardCmd("File not found.", "File not found.", -1);
                             }
                         }
                         else
                         {
-                            return new StandardCmd("File not found.", "File not found.", -1);
+                            result = new StandardCmd("File not found.", "File not found.", -1);
                         }
                     }
                     else
                     {
                         // コンパイルする言語ならコンパイル
-                        if (!_notCompileLanguage.Any(value => value == _lang))
+                        if (_compileLanguage.Any(value => value == _lang))
                         {
-                            if ((result = await CompileAsync(directoryPath, mainFile)).ExitCode != 0)
-                            {
-                                return new StandardCmd("compile error", "compile error", -1);
-                            }
+                            result = await CompileAsync(directoryPath, mainFile);
                         }
                     }
                     // 実行
-                    result = await ExecuteFileAsync(mainFile);
-                    break;
+                    if (result.ExitCode == 0)
+                    {
+                        result = await ExecuteFileAsync(mainFile);
+                        break;
+                    }
                 }
                 await DiscardContainerAsync();
                 await Task.Delay(100);
@@ -214,7 +221,7 @@ namespace GrpcClient
                 }
                 else
                 {
-                    if (_notCompileLanguage.Any(value => value == _lang) || (isZip && mainFile == "")) { }
+                    if (_compileLanguage.Any(value => value == _lang) || (isZip && mainFile == "")) { }
                     else
                     {
                         if (mainFile != "")
@@ -658,7 +665,12 @@ namespace GrpcClient
         private async Task<string> ProcessInOutAutoAsync(Process process)
         {
             string str = "";
-            string[] strIn = _inputStr.Split("\n");
+            string[] inputStrs = _inputStr.Split("\n");
+            // 入力用の文字列を整形する
+            for (int n = 0; n < inputStrs.Length; n++)
+            {
+                inputStrs[n] = inputStrs[n].Trim();
+            }
             int ch = -1;
             int i = 0;
             bool isTimeOut = true;
@@ -679,6 +691,7 @@ namespace GrpcClient
                         {
                             try
                             {
+                                // プログラムの一番最初は起動に時間がかかる場合があるからタイムアウトを長めに取る
                                 if (isFirst)
                                 {
                                     for (int i = 0; i < 200; i++)
@@ -692,7 +705,7 @@ namespace GrpcClient
                                 }
                                 else
                                 {
-                                    //タイムアウトを1msごとに監視tokenがキャンセルになったら次へ
+                                    //タイムアウトを1msごとに監視tokenがキャンセルになったら次へ50ミリ秒で入力待ちと判断し1行入力
                                     for (int i = 0; i < 50; i++)
                                     {
                                         await Task.Delay(1);
@@ -703,23 +716,17 @@ namespace GrpcClient
                                     }
                                 }
 
-
-                                for (int i = 0; i < strIn.Length; i++)
+                                if (i < inputStrs.Length)
                                 {
-                                    strIn[i] = strIn[i].Trim();
-                                }
-
-                                if (i < strIn.Length)
-                                {
-                                    if (strIn[i] == null)
+                                    if (inputStrs[i] == null)
                                     {
                                         return;
                                     }
-                                    if (strIn[i] != null)
+                                    if (inputStrs[i] != null)
                                     {
-                                        sw.WriteLine(strIn[i]);
-                                        Console.WriteLine(strIn[i]);
-                                        str += strIn[i] + "\n";
+                                        sw.WriteLine(inputStrs[i]);
+                                        Console.WriteLine(inputStrs[i]);
+                                        str += inputStrs[i] + "\n";
                                     }
                                     i++;
                                 }
@@ -747,17 +754,21 @@ namespace GrpcClient
                     isTimeOut = false;
                     return str;
                 }
-                finally
+                catch (Exception ex)
                 {
-                    // sr.Close();
-                    // sw.Close();
+                    // 例外発生でプロセスを強制キル
+                    Console.WriteLine(ex.ToString());
+                    process.Kill();
+                    return "error";
                 }
             });
+            // 規定の時間を設定
             int j = 0;
             while (j++ < 1000 && isTimeOut)
             {
                 await Task.Delay(10);
             }
+            // 規定の時間たったらプロセスを強制キル
             if (1000 <= j)
             {
                 process.Kill();
@@ -790,18 +801,16 @@ namespace GrpcClient
             }
             return str;
         }
-        //
         private async Task DownloadFileAsync(string url, string downloadPath)
         {
             Console.WriteLine(url);
             Console.WriteLine(downloadPath);
-            //画像をダウンロード
+            // ダウンロード用URL設定
             var client = new HttpClient();
             var response = await client.GetAsync(url);
             //ステータスコードで成功したかチェック
             if (response.StatusCode != System.Net.HttpStatusCode.OK) return;
-
-            //画像を保存
+            // ファイルをダウンロード
             using var stream = await response.Content.ReadAsStreamAsync();
             using var outStream = File.Create(downloadPath);
             stream.CopyTo(outStream);
