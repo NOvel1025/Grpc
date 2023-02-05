@@ -221,7 +221,7 @@ namespace GrpcClient
                 }
                 else
                 {
-                    if (_compileLanguage.Any(value => value == _lang) || (isZip && mainFile == "")) { }
+                    if (_notCompileLanguage.Any(value => value == _lang) || (isZip && mainFile == "")) { }
                     else
                     {
                         if (mainFile != "")
