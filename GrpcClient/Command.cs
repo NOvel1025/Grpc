@@ -26,6 +26,7 @@ namespace GrpcClient
         /// 自動実行用か手動実行用かのフラグ
         /// </summary>
         private bool _isAuto = false;
+        private bool _isInput = true;
         /// <summary>
         /// 入力文字列
         /// </summary>
@@ -37,7 +38,7 @@ namespace GrpcClient
         /// <summary>
         /// Ex2のダウンロードコントローラのAPI
         /// </summary>
-        private string _ex2PlusUrl = "http://10.40.112.110:5556/api/GrpcDownload/";
+        private string _ex2PlusUrl = "http://126.114.253.21:5556/api/GrpcDownload/";
         /// <summary>
         /// Ex2のダウンロードAPIのキー
         /// </summary>
@@ -385,15 +386,30 @@ namespace GrpcClient
             if (!optionDecision.IsMatch(inputStringLastWord))
             {
                 //inputStringsが一つならコマンド入力中と判定
-                if (inputStrings.Length == 1)
+                if (inputStrings.Length == 1 && inputStringLastWord != "")
                 {
                     //コマンドを検索
-                    string searchCommandCommand = "-c \"docker exec -i -w /usr/bin " + _containerName + " bash -c 'ls | grep ^" + inputStringLastWord + "'\"";
-                    StandardCmd searchCommandResult = await ExecuteAsync(searchCommandCommand);
-                    if (searchCommandResult.ExitCode == 0 && searchCommandResult.Output.Split("\n")[0] != "")
+                    string searchBinCommandCommand = "-c \"docker exec -i -w /usr/bin " + _containerName + " bash -c 'ls | grep ^" + inputStringLastWord + "'\"";
+                    StandardCmd searchBinCommandResult = await ExecuteAsync(searchBinCommandCommand);
+                    string searchLocalBinCommandCommand = "-c \"docker exec -i -w /usr/local/bin " + _containerName + " bash -c 'ls | grep ^" + inputStringLastWord + "'\"";
+                    StandardCmd searchLocalBinCommandResult = await ExecuteAsync(searchLocalBinCommandCommand);
+                    if (searchBinCommandResult.ExitCode == 0 && searchBinCommandResult.Output.Split("\n")[0] != "")
                     {
                         result = "\n";
-                        foreach (string commandCompletion in searchCommandResult.Output.TrimEnd().Split("\n"))
+                        foreach (string commandCompletion in searchBinCommandResult.Output.TrimEnd().Split("\n"))
+                        {
+                            fileNameList.Add(commandCompletion);
+                        }
+                        foreach (string commandCompletion in fileNameList)
+                        {
+                            result += commandCompletion + "  ";
+                        }
+                        result.TrimEnd();
+                    }
+                    if (searchLocalBinCommandResult.ExitCode == 0 && searchLocalBinCommandResult.Output.Split("\n")[0] != "")
+                    {
+                        result = "\n";
+                        foreach (string commandCompletion in searchLocalBinCommandResult.Output.TrimEnd().Split("\n"))
                         {
                             fileNameList.Add(commandCompletion);
                         }
@@ -519,7 +535,7 @@ namespace GrpcClient
             }
 
             //エンコードを判定してコンパイル
-            string encode = judgeEncode(mainFilePath);
+            string encode = JudgeEncode(mainFilePath);
             if (encode.ToLower().Contains("utf-8"))
             {
                 compile += "compile.sh ";
@@ -673,6 +689,8 @@ namespace GrpcClient
             }
             int ch = -1;
             int i = 0;
+            int timeOutCount = 0;
+            if (_isInput){timeOutCount = 50;}else{timeOutCount = 5000;}
             bool isTimeOut = true;
 
             var task = Task.Run(() =>
@@ -694,7 +712,7 @@ namespace GrpcClient
                                 // プログラムの一番最初は起動に時間がかかる場合があるからタイムアウトを長めに取る
                                 if (isFirst)
                                 {
-                                    for (int i = 0; i < 200; i++)
+                                    for (int i = 0; i < (timeOutCount * 4); i++)
                                     {
                                         await Task.Delay(1);
                                         if (token.IsCancellationRequested)
@@ -706,7 +724,7 @@ namespace GrpcClient
                                 else
                                 {
                                     //タイムアウトを1msごとに監視tokenがキャンセルになったら次へ50ミリ秒で入力待ちと判断し1行入力
-                                    for (int i = 0; i < 50; i++)
+                                    for (int i = 0; i < timeOutCount; i++)
                                     {
                                         await Task.Delay(1);
                                         if (token.IsCancellationRequested)
@@ -718,11 +736,8 @@ namespace GrpcClient
 
                                 if (i < inputStrs.Length)
                                 {
-                                    if (inputStrs[i] == null)
-                                    {
-                                        return;
-                                    }
-                                    if (inputStrs[i] != null)
+                                    if (inputStrs[i] == null){return;}
+                                    else
                                     {
                                         sw.WriteLine(inputStrs[i]);
                                         Console.WriteLine(inputStrs[i]);
@@ -803,19 +818,26 @@ namespace GrpcClient
         }
         private async Task DownloadFileAsync(string url, string downloadPath)
         {
-            Console.WriteLine(url);
-            Console.WriteLine(downloadPath);
-            // ダウンロード用URL設定
-            var client = new HttpClient();
-            var response = await client.GetAsync(url);
-            //ステータスコードで成功したかチェック
-            if (response.StatusCode != System.Net.HttpStatusCode.OK) return;
-            // ファイルをダウンロード
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var outStream = File.Create(downloadPath);
-            stream.CopyTo(outStream);
+            try
+            {
+                Console.WriteLine(url);
+                Console.WriteLine(downloadPath);
+                // ダウンロード用URL設定
+                var client = new HttpClient();
+                var response = await client.GetAsync(url);
+                //ステータスコードで成功したかチェック
+                if (response.StatusCode != System.Net.HttpStatusCode.OK) return;
+                // ファイルをダウンロード
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var outStream = File.Create(downloadPath);
+                stream.CopyTo(outStream);
+            }
+            catch (Exception)
+            {
+                return;
+            }
         }
-        private string judgeEncode(string filePath)
+        private string JudgeEncode(string filePath)
         {
             try
             {
@@ -850,6 +872,7 @@ namespace GrpcClient
                 using (StreamReader sr = new StreamReader(filePath))
                 {
                     string fileText = sr.ReadToEnd();
+                    JudgeIsInputFile(fileText);
                     if (_lang == "java11")
                     {
                         if (fileText.ToLower().Contains("void main"))
@@ -912,19 +935,53 @@ namespace GrpcClient
             // メインファイルがあって、メインファイルのパスがdataの直下じゃない場合移動
             if (mainFile != "" && Path.GetFileName(Path.GetDirectoryName(mainFile)) != "data")
             {
-                await moveFileDirectoryAsync(mainFile, directoryPath);
+                await MoveFileDirectoryAsync(mainFile, directoryPath);
             }
             else if (mainFile == "")
             {
                 string firstFilePath = GetFirstFilePath(directoryPath);
                 if (Path.GetFileName(Path.GetDirectoryName(firstFilePath)) != "data")
                 {
-                    await moveFileDirectoryAsync(firstFilePath, directoryPath);
+                    await MoveFileDirectoryAsync(firstFilePath, directoryPath);
                 }
                 mainFile = firstFilePath;
             }
 
             return mainFile;
+        }
+        private void JudgeIsInputFile(string text)
+        {
+            switch (_lang)
+            {
+                case "clang":
+                    if (text.Contains("getchar()") || text.Contains(@"gets\([\w]+\)") || text.Contains(@"fgets\([\w]+\)") || text.Contains(@"scanf\([\w]\)"))
+                    {
+                        _isInput = true;
+                    }
+                    break;
+                case "java11":
+                    if (text.Contains("Scanner") || text.Contains("BufferedReader"))
+                    {
+                        _isInput = true;
+                    }
+                    break;
+                case "python3":
+                    if (text.Contains("input()"))
+                    {
+                        _isInput = true;
+                    }
+                    break;
+                case "php":
+                    if (text.Contains("fgets(STDIN)") || text.Contains(@"fgets\([\w]*\)"))
+                    {
+                        _isInput = true;
+                    }
+                    break;
+                default:
+                    _isInput = false;
+                    break;
+            }
+            return;
         }
         private string GenerateCompileString(string diretoryPath, string mainFile)
         {
@@ -1016,7 +1073,7 @@ namespace GrpcClient
             }
             return "";
         }
-        private async Task moveFileDirectoryAsync(string filePath, string directoryPath)
+        private async Task MoveFileDirectoryAsync(string filePath, string directoryPath)
         {
             string mv = "-c \"mv " + Path.GetDirectoryName(filePath) + "/* " + directoryPath;
             await ExecuteAsync(mv);
