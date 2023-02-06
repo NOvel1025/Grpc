@@ -1,0 +1,11 @@
+FROM centos:7
+
+ENV LANG="ja_JP.UTF-8"
+ENV PYTHONIOENCODING=utf-8
+ENV HTTP_PROXY=http://proxy.jec.ac.jp:8080/
+RUN echo proxy=http://proxy.jec.ac.jp:8080/ >> /etc/yum.conf
+RUN yum -yt install wget
+WORKDIR /tmp
+RUN wget https://repo.anaconda.com/archive/Anaconda3-2022.10-Linux-x86_64.sh
+COPY input.txt ./
+RUN bash Anaconda3-2022.10-Linux-x86_64.sh < input.txt
