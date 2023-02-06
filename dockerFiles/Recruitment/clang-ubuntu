@@ -17,8 +17,8 @@ ENV LC_ALL ja_JP.UTF-8
 ENV TZ JST-9
 ENV TERM xterm
 RUN mv /usr/bin/gcc /usr/bin/.real_gcc
-RUN echo "/usr/bin/.real_gcc -fexec-charset=utf-8 $*" > /usr/bin/gcc
-RUN echo "/usr/bin/.real_gcc -finput-charset=utf-8 -fexec-charset=utf-8 $*" > /usr/bin/gccu
-RUN echo "/usr/bin/.real_gcc -finput-charset=cp932 -fexec-charset=utf-8 $*" > /usr/bin/gccs
-RUN echo "/usr/bin/.real_gcc -finput-charset=ascii -fexec-charset=utf-8 $*" > /usr/bin/gcca
+RUN echo "/usr/bin/.real_gcc -fexec-charset=utf-8 \$*" > /usr/bin/gcc
+RUN echo "/usr/bin/.real_gcc -finput-charset=utf-8 -fexec-charset=utf-8 \$*" > /usr/bin/gccu
+RUN echo "/usr/bin/.real_gcc -finput-charset=cp932 -fexec-charset=utf-8 \$*" > /usr/bin/gccs
+RUN echo "/usr/bin/.real_gcc -finput-charset=ascii -fexec-charset=utf-8 \$*" > /usr/bin/gcca
 RUN chmod 777 /usr/bin/gcc*
