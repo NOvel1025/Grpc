@@ -1,1 +1,1 @@
-docker run -itd --privileged --name java11test -v /home/kondo/bashfile/java11/testData:/opt/testData -v /home/kondo/bashfile/java11/bin:/opt/bin/ java:11 /sbin/init
+docker run -itd --privileged --rm --name java11test -v ~/Grpc/TestData/java11/Data:/opt/Data -v ~/Grpc/GrpcClient/PreparationFiles/java11/bin:/opt/bin/ java11:latest

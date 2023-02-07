@@ -38,7 +38,7 @@ namespace GrpcClient
         /// <summary>
         /// Ex2のダウンロードコントローラのAPI
         /// </summary>
-        private string _ex2PlusUrl = "http://10.40.112.110:5556/api/GrpcDownload/";
+        private string _ex2PlusUrl = "http://126.114.253.21:5556/api/GrpcDownload/";
         /// <summary>
         /// Ex2のダウンロードAPIのキー
         /// </summary>
@@ -389,27 +389,12 @@ namespace GrpcClient
                 if (inputStrings.Length == 1 && inputStringLastWord != "")
                 {
                     //コマンドを検索
-                    string searchBinCommandCommand = "-c \"docker exec -i -w /usr/bin " + _containerName + " bash -c 'ls | grep ^" + inputStringLastWord + "'\"";
-                    StandardCmd searchBinCommandResult = await ExecuteAsync(searchBinCommandCommand);
-                    string searchLocalBinCommandCommand = "-c \"docker exec -i -w /usr/local/bin " + _containerName + " bash -c 'ls | grep ^" + inputStringLastWord + "'\"";
-                    StandardCmd searchLocalBinCommandResult = await ExecuteAsync(searchLocalBinCommandCommand);
-                    if (searchBinCommandResult.ExitCode == 0 && searchBinCommandResult.Output.Split("\n")[0] != "")
+                    string searchCommandCommand = "-c \"docker exec -i -w /usr/bin " + _containerName + " bash -c 'for x in ${PATH//:/ }; do ls -1 $x; done | sort | uniq | grep ^" + inputStringLastWord + "'\"";
+                    StandardCmd searchCommandResult = await ExecuteAsync(searchCommandCommand);
+                    if (searchCommandResult.ExitCode == 0 && searchCommandResult.Output.Split("\n")[0] != "")
                     {
                         result = "\n";
-                        foreach (string commandCompletion in searchBinCommandResult.Output.TrimEnd().Split("\n"))
-                        {
-                            fileNameList.Add(commandCompletion);
-                        }
-                        foreach (string commandCompletion in fileNameList)
-                        {
-                            result += commandCompletion + "  ";
-                        }
-                        result.TrimEnd();
-                    }
-                    if (searchLocalBinCommandResult.ExitCode == 0 && searchLocalBinCommandResult.Output.Split("\n")[0] != "")
-                    {
-                        result = "\n";
-                        foreach (string commandCompletion in searchLocalBinCommandResult.Output.TrimEnd().Split("\n"))
+                        foreach (string commandCompletion in searchCommandResult.Output.TrimEnd().Split("\n"))
                         {
                             fileNameList.Add(commandCompletion);
                         }
@@ -469,7 +454,7 @@ namespace GrpcClient
                     }
                 }
                 // リストの最初の要素がなかったら検索結果が0とみなし何もしない
-                if (fileNameList[0] != "")
+                if (fileNameList.Count != 0 && fileNameList[0] != "")
                 {
                     result += "\n[" + (await CurrentDirectoryContainerAsync()).Output.Trim() + "]# ";
                     //入力してあったものを入れなおす
