@@ -1,0 +1,20 @@
+FROM centos:7
+
+ENV LANG="ja_JP.UTF-8"
+RUN export HTTP_PROXY=http://proxy.jec.ac.jp:8080/
+RUN echo proxy=http://proxy.jec.ac.jp:8080/ >> /etc/yum.conf
+RUN yum install -yt --nogpgcheck wget
+RUN yum install -yt --nogpgcheck zip unzip
+RUN mkdir -p /usr/java
+RUN echo http_proxy=http://proxy.jec.ac.jp:8080/ >> /etc/wgetrc
+RUN echo https_proxy=http://proxy.jec.ac.jp:8080/ >> /etc/wgetrc
+RUN wget -q -P /usr/java/  https://download.java.net/java/GA/jdk17.0.1/2a2082e5a09d4267845be086888add4f/12/GPL/openjdk-17.0.1_linux-x64_bin.tar.gz
+RUN tar xvfz /usr/java/openjdk-17.0.1_linux-x64_bin.tar.gz -C /usr/java/
+RUN rm -f /usr/java/openjdk-17.0.1_linux-x64_bin.tar.gz
+RUN alternatives --install /usr/bin/java java /usr/java/jdk-17.0.1/bin/java 1
+RUN alternatives --install /usr/bin/javac javac /usr/java/jdk-17.0.1/bin/javac 1
+RUN mv /usr/bin/java /usr/bin/.real_java
+RUN echo "/usr/bin/.real_java -Dfile.encoding=UTF-8 \$*" > /usr/bin/java
+RUN echo "/usr/bin/javac -encoding UTF-8 \$*" > /usr/bin/javacu
+RUN echo "/usr/bin/javac -encoding Shift_JIS \$*" > /usr/bin/javacs
+RUN chmod 777 /usr/bin/java*
