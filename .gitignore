@@ -1,8 +1,6 @@
 .vscode
 .vs
 GrpcClient/bin
-GrpcEClientAuto/bin
-GrpcEClientManual/bin
 GrpcServer/bin
 obj
 ExecuteFiles/*
