@@ -1061,7 +1061,6 @@ namespace GrpcClient
         private async Task MoveFileDirectoryAsync(string filePath, string directoryPath)
         {
             Console.WriteLine("filePath : " + filePath);
-            Console.ReadKey();
             string mv = "-c \"mv " + Path.GetDirectoryName(filePath) + "/* " + directoryPath;
             await ExecuteAsync(mv);
             string rm = "-c \"rm -fR " + Path.GetDirectoryName(filePath);
