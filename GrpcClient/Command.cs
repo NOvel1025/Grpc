@@ -34,11 +34,11 @@ namespace GrpcClient
         /// <summary>
         /// 基本ディレクトリのパス
         /// </summary>
-        private string _path = "/opt/data";
+        private string _path = "/opt/Data";
         /// <summary>
         /// Ex2のダウンロードコントローラのAPI
         /// </summary>
-        private string _ex2PlusUrl = "http://126.114.253.21:5556/api/GrpcDownload/";
+        private string _ex2PlusUrl = "http://10.40.112.110:5556/api/GrpcDownload/";
         /// <summary>
         /// Ex2のダウンロードAPIのキー
         /// </summary>
@@ -109,7 +109,7 @@ namespace GrpcClient
             StandardCmd result = new();
             string mainFile = "";
             // ファイルが保存されるパスを指定
-            string directoryPath = "./executeFiles/" + _containerName + "/data";
+            string directoryPath = "./ExecuteFiles/" + _containerName + "/Data";
             // 5回試行して、エラーだったら何もせず抜ける
             for (int i = 0; i < 5; i++)
             {
@@ -187,7 +187,7 @@ namespace GrpcClient
 
             StandardCmd result = new();
             string mainFile = "";
-            string directoryPath = "./executeFiles/" + _containerName + "/data";
+            string directoryPath = "./ExecuteFiles/" + _containerName + "/Data";
             if ((result = await BuildExecuteEnvironmentAsync()).ExitCode == 0)
             {
                 foreach (FileInformation fileInformation in fileInformations)
@@ -240,7 +240,7 @@ namespace GrpcClient
         }
         /// <summary>
         /// コンテナに必要なフォルダを作ってコンテナを立てる
-        /// コンテナを立てる処理はバッシュファイルに記述(./bashfile/container.sh)
+        /// コンテナを立てる処理はバッシュファイルに記述(./PreparationFiles/bin/container.sh)
         /// </summary>
         /// <returns>実行結果</returns>
         public async Task<StandardCmd> BuildExecuteEnvironmentAsync()
@@ -277,7 +277,7 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> BuildContainerAsync()
         {
-            string build = "./bashfile/container.sh " + _lang + " " + _containerName;
+            string build = "./PreparationFiles/bin/container.sh " + _lang + " " + _containerName;
             return await ExecuteAsync(build);
         }
         public async Task<StandardCmd> StopContainerAsync()
@@ -292,22 +292,22 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> MkdirExecuteFoldersAsync()
         {
-            string mkdir = "./bashfile/mkdirExecuteFolder.sh " + _containerName;
+            string mkdir = "./PreparationFiles/bin/mkdirExecuteFolder.sh " + _containerName;
             return await ExecuteAsync(mkdir);
         }
         public async Task<StandardCmd> CpExecuteFoldersAsync()
         {
-            string cp = "./bashfile/cpExecuteFolder.sh " + _lang + " " + _containerName;
+            string cp = "./PreparationFiles/bin/cpExecuteFolder.sh " + _lang + " " + _containerName;
             return await ExecuteAsync(cp);
         }
         public async Task<StandardCmd> RmContainerFilesAsync()
         {
-            string rmFiles = "-c \"docker exec -i -w /opt/data " + _containerName + " bash -c 'rm -fR *'\"";
+            string rmFiles = "-c \"docker exec -i -w /opt/Data " + _containerName + " bash -c 'rm -fR *'\"";
             return await ExecuteAsync(rmFiles);
         }
         public async Task<StandardCmd> RmExecuteFoldersAsync()
         {
-            string rmFolder = "./bashfile/rmExecuteFolder.sh " + _containerName;
+            string rmFolder = "./PreparationFiles/bin/rmExecuteFolder.sh " + _containerName;
             return await ExecuteAsync(rmFolder);
         }
         public async Task<StandardCmd> CmdContainerAsync(string line)
@@ -365,7 +365,7 @@ namespace GrpcClient
         }
         public async Task<StandardCmd> RmAsync(string fileName)
         {
-            string cmdStr = "-c \"docker exec -i -w /opt/data " + _containerName + " bash -c 'rm -Rf " + fileName + "\"";
+            string cmdStr = "-c \"docker exec -i -w /opt/Data " + _containerName + " bash -c 'rm -Rf " + fileName + "\"";
             return await ExecuteAsync(cmdStr);
         }
         public async Task<string> TabCompletionAsync(string inputCommandString)
@@ -552,7 +552,6 @@ namespace GrpcClient
             {
                 return new StandardCmd("compile error encoding " + encode, "compile errorencoding " + encode, -1);
             }
-
             // 言語ごとに違う引数を渡す
             if (_lang == "java11")
             {
@@ -589,7 +588,7 @@ namespace GrpcClient
                 string mainFilePath = Path.GetDirectoryName(fileName) == "" ? "" : "/" + Path.GetDirectoryName(fileName);
                 string className = Path.GetFileNameWithoutExtension(fileName);
                 string[] executeDirectoryPath = _generateDirectoryPath.Split("/");
-                cmdStr = "-c \"docker exec -i -w /opt/data " + _containerName + " bash -c 'bash /opt/bin/execute.sh " + Path.GetDirectoryName(_generateDirectoryPath) + "/" + className + "'\"";
+                cmdStr = "-c \"docker exec -i -w /opt/Data " + _containerName + " bash -c 'bash /opt/bin/execute.sh " + Path.GetDirectoryName(_generateDirectoryPath) + "/" + className + "'\"";
             }
 
             return await ExecuteAsync(cmdStr);
@@ -693,7 +692,7 @@ namespace GrpcClient
             if (_isInput){timeOutCount = 50;}else{timeOutCount = 5000;}
             bool isTimeOut = true;
 
-            var task = Task.Run(() =>
+            var task = Task.Run(async () =>
             {
                 StreamWriter sw = process.StandardInput;
                 StreamReader sr = process.StandardOutput;
@@ -705,7 +704,7 @@ namespace GrpcClient
                         var cts = new CancellationTokenSource();
                         CancellationToken token = cts.Token;
                         //非同期でインプットストリームへ書き込み、タイムアウトで書き込みキャンセル
-                        _ = Task.Run(async () =>
+                        var inputTask = Task.Run(async () =>
                         {
                             try
                             {
@@ -762,9 +761,11 @@ namespace GrpcClient
                         }
                         else
                         {
+                            cts.Cancel();
                             break;
                         }
                         isFirst = false;
+                        await inputTask;
                     }
                     isTimeOut = false;
                     return str;
@@ -932,15 +933,15 @@ namespace GrpcClient
                     mainFile = filePath;
                 }
             }
-            // メインファイルがあって、メインファイルのパスがdataの直下じゃない場合移動
-            if (mainFile != "" && Path.GetFileName(Path.GetDirectoryName(mainFile)) != "data")
+            // メインファイルがあって、メインファイルのパスがDataの直下じゃない場合移動
+            if (mainFile != "" && Path.GetFileName(Path.GetDirectoryName(mainFile)) != "Data")
             {
                 await MoveFileDirectoryAsync(mainFile, directoryPath);
             }
             else if (mainFile == "")
             {
                 string firstFilePath = GetFirstFilePath(directoryPath);
-                if (Path.GetFileName(Path.GetDirectoryName(firstFilePath)) != "data")
+                if (Path.GetFileName(Path.GetDirectoryName(firstFilePath)) != "Data")
                 {
                     await MoveFileDirectoryAsync(firstFilePath, directoryPath);
                 }
@@ -991,7 +992,7 @@ namespace GrpcClient
             {
                 if (Path.GetFileName(filePath) == mainFile)
                 {
-                    compile += ("../data/" + Path.GetFileNameWithoutExtension(mainFile) + " ");
+                    compile += ("../Data/" + Path.GetFileNameWithoutExtension(mainFile) + " ");
                     break;
                 }
             }
@@ -999,14 +1000,13 @@ namespace GrpcClient
             {
                 if (Path.GetFileName(filePath) == mainFile)
                 {
-                    compile += ("../data/" + Path.GetFileName(mainFile) + " ");
-                    break;
+                    compile += ("../Data/" + Path.GetFileName(mainFile) + " ");
                 }
                 else
                 {
                     if (Path.GetExtension(filePath) == ".c")
                     {
-                        compile += ("../data/" + Path.GetFileName(filePath) + " ");
+                        compile += ("../Data/" + Path.GetFileName(filePath) + " ");
                     }
                 }
             }
@@ -1075,6 +1075,8 @@ namespace GrpcClient
         }
         private async Task MoveFileDirectoryAsync(string filePath, string directoryPath)
         {
+            Console.WriteLine("filePath : " + filePath);
+            Console.ReadKey();
             string mv = "-c \"mv " + Path.GetDirectoryName(filePath) + "/* " + directoryPath;
             await ExecuteAsync(mv);
             string rm = "-c \"rm -fR " + Path.GetDirectoryName(filePath);

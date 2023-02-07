@@ -1,1 +1,1 @@
-docker run -itd --privileged --rm --name clangtest -v ~/Grpc/TestData/clangbk/data:/opt/data -v ~/Grpc/GrpcClient/bashfile/clang/bin:/opt/bin/ clang
+docker run -itd --privileged --rm --name clangtest -v ~/Grpc/TestData/clang/Data:/opt/Data -v ~/Grpc/GrpcClient/PreparationFiles/clang/bin:/opt/bin/ clangsbin /sbin/init
