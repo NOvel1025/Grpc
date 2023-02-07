@@ -249,6 +249,4 @@ ModelManifest.xml
 
 #Local NuGet repository
 !NuGetPackages/*
-GrpcClient/executeFiles
 .vscode
-GrpcClient/bashfile/*bk
