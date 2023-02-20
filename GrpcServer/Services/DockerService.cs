@@ -7,13 +7,8 @@ namespace GrpcServer.Services;
 
 public class DockerService : Docker.DockerBase
 {
-    // private static string _fileName = "";
-    // private string _path = "./testData/";
-    // private static bool isFile = true;
-    // private static bool isEndProcess = true;
     private readonly ILogger<DockerService> _logger;
     private readonly DockerController _con = new DockerController();
-    // static bool isEnd = false;    
     public DockerService(ILogger<DockerService> logger)
     {
         _logger = logger;
@@ -21,7 +16,7 @@ public class DockerService : Docker.DockerBase
     public override async Task AutoExecStream(IAsyncStreamReader<ExecutionResult> req, IServerStreamWriter<SubmissionInformation> res, ServerCallContext context)
     {
         
-        Console.WriteLine("-----自動実行接続完了-----");
+        // Console.WriteLine("-----自動実行接続完了-----");
         _con.ConnectServer(req, res);
         while(true){await Task.Delay(10000);}
     }
@@ -32,7 +27,7 @@ public class DockerService : Docker.DockerBase
         return ans;
     }
     public override async Task ManualRequest(Empty req, IServerStreamWriter<SubmissionInformation> res, ServerCallContext context){
-        Console.WriteLine("-----手動実行クライアント接続完了-----");
+        // Console.WriteLine("-----手動実行クライアント接続完了-----");
         _con.ConnectServer(req, res);
         while(true){await Task.Delay(10000);}
     }
