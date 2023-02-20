@@ -38,7 +38,7 @@ namespace GrpcClient
         /// <summary>
         /// Ex2のダウンロードコントローラのAPI
         /// </summary>
-        private string _ex2PlusUrl = "http://126.114.253.21:5556/api/GrpcDownload/";
+        private string _ex2PlusUrl = "http://10.64.225.203:5556/api/GrpcDownload/";
         /// <summary>
         /// Ex2のダウンロードAPIのキー
         /// </summary>
@@ -674,7 +674,7 @@ namespace GrpcClient
             int ch = -1;
             int i = 0;
             int timeOutCount = 0;
-            if (_isInput){timeOutCount = 50;}else{timeOutCount = 5000;}
+            if (_isInput) { timeOutCount = 50; } else { timeOutCount = 5000; }
             bool isTimeOut = true;
 
             var task = Task.Run(async () =>
@@ -693,41 +693,44 @@ namespace GrpcClient
                         {
                             try
                             {
-                                // プログラムの一番最初は起動に時間がかかる場合があるからタイムアウトを長めに取る
-                                if (isFirst)
+                                while (!token.IsCancellationRequested)
                                 {
-                                    for (int i = 0; i < (timeOutCount * 4); i++)
+                                    // プログラムの一番最初は起動に時間がかかる場合があるからタイムアウトを長めに取る
+                                    if (isFirst)
                                     {
-                                        await Task.Delay(1);
-                                        if (token.IsCancellationRequested)
+                                        for (int i = 0; i < (timeOutCount * 4); i++)
                                         {
-                                            return;
+                                            await Task.Delay(1);
+                                            if (token.IsCancellationRequested)
+                                            {
+                                                return;
+                                            }
                                         }
                                     }
-                                }
-                                else
-                                {
-                                    //タイムアウトを1msごとに監視tokenがキャンセルになったら次へ50ミリ秒で入力待ちと判断し1行入力
-                                    for (int i = 0; i < timeOutCount; i++)
-                                    {
-                                        await Task.Delay(1);
-                                        if (token.IsCancellationRequested)
-                                        {
-                                            return;
-                                        }
-                                    }
-                                }
-
-                                if (i < inputStrs.Length)
-                                {
-                                    if (inputStrs[i] == null){return;}
                                     else
                                     {
-                                        sw.WriteLine(inputStrs[i]);
-                                        Console.WriteLine(inputStrs[i]);
-                                        str += inputStrs[i] + "\n";
+                                        //タイムアウトを1msごとに監視tokenがキャンセルになったら次へ50ミリ秒で入力待ちと判断し1行入力
+                                        for (int i = 0; i < timeOutCount; i++)
+                                        {
+                                            await Task.Delay(1);
+                                            if (token.IsCancellationRequested)
+                                            {
+                                                return;
+                                            }
+                                        }
                                     }
-                                    i++;
+
+                                    if (i < inputStrs.Length)
+                                    {
+                                        if (inputStrs[i] == null) { return; }
+                                        else
+                                        {
+                                            sw.WriteLine(inputStrs[i]);
+                                            Console.WriteLine(inputStrs[i]);
+                                            str += inputStrs[i] + "\n";
+                                        }
+                                        i++;
+                                    }
                                 }
                             }
                             catch (NullReferenceException ex)
@@ -737,7 +740,6 @@ namespace GrpcClient
 
                             return;
                         });
-                        //一文字取り出してファイルの最後じゃなかったら次へ
                         if ((ch = sr.Read()) != -1)
                         {
                             str += (char)ch;
