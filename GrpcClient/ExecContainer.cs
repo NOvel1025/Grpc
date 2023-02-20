@@ -58,7 +58,7 @@ namespace GrpcClient
                 while (await server.ResponseStream.MoveNext(cancellationToken: CancellationToken.None))
                 {
                     AutoContainerArguments autoContainerArguments = new AutoContainerArguments(server.ResponseStream.Current, i);
-                    Console.WriteLine(server.ResponseStream.Current.ToString());
+                    // Console.WriteLine(server.ResponseStream.Current.ToString());
                     if (!autoContainerArguments.IsAvailableLanguage)
                     {
                         await server.RequestStream.WriteAsync(new ExecutionResult { SubmissionFile = "not available language.", AnswerFile = "not available language.", Correction = 0 });
@@ -137,7 +137,7 @@ namespace GrpcClient
                     executionResult.Correction = autoContainerArguments.Correction;
 
                     await server.RequestStream.WriteAsync(executionResult);
-                    Console.WriteLine("-----end-----\n");
+                    // Console.WriteLine("-----end-----\n");
                 }
                 await server.RequestStream.CompleteAsync();
             }
@@ -271,7 +271,7 @@ namespace GrpcClient
                         }
                         await manualExec.DiscardContainerAsync();
                     }
-                    Console.WriteLine("-----end-----\n");
+                    // Console.WriteLine("-----end-----\n");
                 }
             }
             catch (Exception ex)

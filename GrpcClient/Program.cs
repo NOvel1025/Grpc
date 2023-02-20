@@ -14,21 +14,22 @@ namespace GrpClient
         private static async Task Main(string[] args)
         {
             //クライアントの個数
-            int containerCount = 3;
+            int autoContainerCount = 20;
+            int manualContainerCount = 6;
             ExecContainer execContainer = new();
-            var task = Task.Run(async () =>
+            var autoExecuteTask = Task.Run(async () =>
             {
-                await execContainer.AutoExecClientAsync(containerCount);
+                await execContainer.AutoExecClientAsync(autoContainerCount);
             });
-            var task2 = Task.Run(async () =>
+            var manualExecuteTask = Task.Run(async () =>
             {
-                await execContainer.ManualExecAsync(containerCount);
+                await execContainer.ManualExecAsync(manualContainerCount);
             });
             List<Task> taskList = new List<Task>();
-            taskList.Add(task);
-            taskList.Add(task2);
+            taskList.Add(autoExecuteTask);
+            taskList.Add(manualExecuteTask);
             await Task.WhenAll(taskList);
-            Console.WriteLine("done");
+            // Console.WriteLine("done");
         }
     }
 }

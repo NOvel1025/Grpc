@@ -67,7 +67,7 @@ namespace GrpcServer
                 if (cClient.Available)
                 {
                     cClient.Available = false;
-                    Console.WriteLine(execFile.ToString());
+                    // Console.WriteLine(execFile.ToString());
                     if (cClient.Res != null)
                     {
                         await cClient.Res.WriteAsync(execFile);
@@ -123,7 +123,7 @@ namespace GrpcServer
                                 while (await manualContainer.Req.MoveNext())
                                 {
                                     var value = manualContainer.Req.Current;
-                                    Console.Write(value.ExecutionOutputStr);
+                                    // Console.Write(value.ExecutionOutputStr);
                                     if (manualEx2Client.Res == null)
                                     {
                                         continue;

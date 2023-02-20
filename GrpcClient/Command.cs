@@ -590,7 +590,7 @@ namespace GrpcClient
             {
                 ProcessStartInfo p1 = new ProcessStartInfo("bash", cmdStr);
 
-                Console.WriteLine("bash " + cmdStr);
+                // Console.WriteLine("bash " + cmdStr);
 
                 p1.RedirectStandardOutput = true;
                 p1.RedirectStandardError = true;
@@ -622,9 +622,9 @@ namespace GrpcClient
 
                 process.Close();
 
-                Console.WriteLine("output:" + output);
-                Console.WriteLine("error:" + error);
-                Console.WriteLine("exitCode:" + exitCode);
+                // Console.WriteLine("output:" + output);
+                // Console.WriteLine("error:" + error);
+                // Console.WriteLine("exitCode:" + exitCode);
 
                 return new StandardCmd(str, error, exitCode);
             });
@@ -726,7 +726,7 @@ namespace GrpcClient
                                         else
                                         {
                                             sw.WriteLine(inputStrs[i]);
-                                            Console.WriteLine(inputStrs[i]);
+                                            // Console.WriteLine(inputStrs[i]);
                                             str += inputStrs[i] + "\n";
                                         }
                                         i++;
@@ -735,7 +735,7 @@ namespace GrpcClient
                             }
                             catch (NullReferenceException ex)
                             {
-                                Console.WriteLine(ex.ToString());
+                                // Console.WriteLine(ex.ToString());
                             }
 
                             return;
@@ -743,7 +743,7 @@ namespace GrpcClient
                         if ((ch = sr.Read()) != -1)
                         {
                             str += (char)ch;
-                            Console.Write((char)ch);
+                            // Console.Write((char)ch);
                             cts.Cancel();
                         }
                         else
@@ -760,7 +760,7 @@ namespace GrpcClient
                 catch (Exception ex)
                 {
                     // 例外発生でプロセスを強制キル
-                    Console.WriteLine(ex.ToString());
+                    // Console.WriteLine(ex.ToString());
                     process.Kill();
                     return "error";
                 }
@@ -808,8 +808,8 @@ namespace GrpcClient
         {
             try
             {
-                Console.WriteLine(url);
-                Console.WriteLine(downloadPath);
+                // Console.WriteLine(url);
+                // Console.WriteLine(downloadPath);
                 // ダウンロード用URL設定
                 var client = new HttpClient();
                 var response = await client.GetAsync(url);
@@ -1062,7 +1062,7 @@ namespace GrpcClient
         }
         private async Task MoveFileDirectoryAsync(string filePath, string directoryPath)
         {
-            Console.WriteLine("filePath : " + filePath);
+            // Console.WriteLine("filePath : " + filePath);
             string mv = "-c \"mv " + Path.GetDirectoryName(filePath) + "/* " + directoryPath;
             await ExecuteAsync(mv);
             string rm = "-c \"rm -fR " + Path.GetDirectoryName(filePath);
