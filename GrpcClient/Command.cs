@@ -38,7 +38,7 @@ namespace GrpcClient
         /// <summary>
         /// Ex2のダウンロードコントローラのAPI
         /// </summary>
-        private string _ex2PlusUrl = "http://10.64.225.203:5556/api/GrpcDownload/";
+        private string _ex2PlusUrl = "http://localhost:5556/api/GrpcDownload/";
         /// <summary>
         /// Ex2のダウンロードAPIのキー
         /// </summary>
